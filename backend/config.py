@@ -1,20 +1,28 @@
-import os
-from pathlib import Path
+# ==========================
+# Flask 基础配置
+# ==========================
 
-from dotenv import load_dotenv
+SECRET_KEY = "smart-campus-alarm-2026-secret"
 
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+# ==========================
+# 数据库配置
+# ==========================
 
+# SQLite 数据库
+SQLALCHEMY_DATABASE_URI = "sqlite:///smart_campus.db"
+SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret")
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        "sqlite:///{}".format(BASE_DIR / "smart_campus_security.db"),
-    )
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    RTMP_URL = os.getenv("RTMP_URL", "")
-    DINGTALK_WEBHOOK = os.getenv("DINGTALK_WEBHOOK", "")
-    REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+# ==========================
+# SocketIO 配置
+# ==========================
+
+SOCKET_CORS = "*"
+
+# ==========================
+# 钉钉机器人配置
+# ==========================
+
+# 请替换成你自己的钉钉机器人 Webhook
+DINGTALK_WEBHOOK = (
+    "https://oapi.dingtalk.com/robot/send?access_token=替换成你的token"
+)

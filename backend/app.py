@@ -1,35 +1,76 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from flask_socketio import SocketIO
-
-from api.dashboard_api import dashboard_bp
-from api.event_api import event_bp
-from api.rule_api import rule_bp
-from api.user_api import user_bp
-from config import Config
-from models import db
-
-socketio = SocketIO(cors_allowed_origins="*")
-jwt = JWTManager()
 
 
-def create_app(config_class=Config):
-    app = Flask(__name__)
-    app.config.from_object(config_class)
+import config
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
-    db.init_app(app)
-    jwt.init_app(app)
-    socketio.init_app(app)
+from extensions import db, socketio
 
-    app.register_blueprint(user_bp, url_prefix="/api/auth")
-    app.register_blueprint(rule_bp, url_prefix="/api/zones")
-    app.register_blueprint(event_bp, url_prefix="/api/alarms")
-    app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
 
-    return app
+
+app = Flask(__name__)
+
+app.config.from_object(config)
+
+
+CORS(
+    app,
+    supports_credentials=True
+)
+
+
+
+db.init_app(app)
+
+
+socketio.init_app(
+    app,
+    cors_allowed_origins=config.SOCKET_CORS
+)
+
+
+
+from api import event_bp, dashboard_bp
+
+
+app.register_blueprint(
+    event_bp
+)
+
+app.register_blueprint(
+    dashboard_bp
+)
+
+
+
+import services.ws_handler
+
+
+
+from services.scheduler import start_scheduler
+
+
+start_scheduler(app)
+
+
+
+from api.event_api import create_alarm_record
+
+
+app.create_alarm = create_alarm_record
+
 
 
 if __name__ == "__main__":
-    socketio.run(create_app(), host="0.0.0.0", port=5000, debug=True)
+
+    with app.app_context():
+
+        db.create_all()
+
+
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )

@@ -1,15 +1,63 @@
 from datetime import datetime
 
-from . import db
+from extensions import db
 
 
 class AlarmEvent(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    alarm_type = db.Column(db.String(64), nullable=False)
-    level = db.Column(db.String(32), nullable=False, default="medium")
-    camera_id = db.Column(db.String(64), nullable=False, index=True)
-    coordinate = db.Column(db.JSON, nullable=True)
-    status = db.Column(db.String(32), nullable=False, default="pending")
-    snapshot_path = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    handled_at = db.Column(db.DateTime, nullable=True)
+    """告警事件模型"""
+
+    __tablename__ = "alarm_events"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    camera_id = db.Column(
+        db.String(64),
+        nullable=False
+    )
+
+    alarm_type = db.Column(
+        db.String(32),
+        nullable=False
+    )
+
+    severity = db.Column(
+        db.String(16),
+        default="low"
+    )
+
+    content = db.Column(
+        db.Text
+    )
+
+    handle_status = db.Column(
+        db.String(16),
+        default="pending"
+    )
+
+    handle_note = db.Column(
+        db.Text
+    )
+
+    create_time = db.Column(
+        db.DateTime,
+        default=datetime.now
+    )
+
+    update_time = db.Column(
+        db.DateTime,
+        default=datetime.now,
+        onupdate=datetime.now
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "camera_id": self.camera_id,
+            "alarm_type": self.alarm_type,
+            "severity": self.severity,
+            "content": self.content,
+            "handle_status": self.handle_status,
+            "handle_note": self.handle_note,
+            "create_time": self.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            if self.create_time else ""
+        }

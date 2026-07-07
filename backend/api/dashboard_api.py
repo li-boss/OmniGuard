@@ -1,35 +1,59 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, time
 
-from flask import Blueprint, jsonify
+from flask import jsonify
+from sqlalchemy import func
 
-from models import AlarmEvent
-
-dashboard_bp = Blueprint("dashboard_api", __name__)
-
-
-@dashboard_bp.get("/summary")
-def summary():
-    total = AlarmEvent.query.count()
-    pending = AlarmEvent.query.filter_by(status="pending").count()
-    return jsonify({"total_alarms": total, "pending_alarms": pending})
+from api import dashboard_bp
+from extensions import db
+from models.alarm import AlarmEvent
 
 
-@dashboard_bp.get("/alarm-trend")
-def alarm_trend():
-    today = datetime.utcnow().date()
-    data = []
-    for offset in range(6, -1, -1):
-        day = today - timedelta(days=offset)
-        count = AlarmEvent.query.filter(
-            AlarmEvent.created_at >= datetime.combine(day, datetime.min.time()),
-            AlarmEvent.created_at <= datetime.combine(day, datetime.max.time()),
-        ).count()
-        data.append({"date": day.isoformat(), "count": count})
-    return jsonify(data)
+
+@dashboard_bp.route(
+    "/summary",
+    methods=["GET"]
+)
+def dashboard_summary():
+
+    today_start = datetime.combine(
+        date.today(),
+        time.min
+    )
 
 
-@dashboard_bp.get("/disposal-rate")
-def disposal_rate():
-    total = AlarmEvent.query.count()
-    handled = AlarmEvent.query.filter(AlarmEvent.status.in_(["handled", "ignored"])).count()
-    return jsonify({"rate": handled / total if total else 0})
+    today_total = AlarmEvent.query.filter(
+        AlarmEvent.create_time >= today_start
+    ).count()
+
+
+    pending_count = AlarmEvent.query.filter_by(
+        handle_status="pending"
+    ).count()
+
+
+    level_result = (
+        db.session.query(
+            AlarmEvent.severity,
+            func.count(AlarmEvent.id)
+        )
+        .group_by(
+            AlarmEvent.severity
+        )
+        .all()
+    )
+
+
+    level_dist = {
+        key: value
+        for key, value in level_result
+    }
+
+
+    return jsonify({
+        "code": 200,
+        "data": {
+            "today_total": today_total,
+            "pending_count": pending_count,
+            "level_dist": level_dist
+        }
+    })

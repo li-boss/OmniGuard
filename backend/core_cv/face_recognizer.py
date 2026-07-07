@@ -146,6 +146,27 @@ class FaceRecognizer:
             if face_crop.size == 0:
                 return False, None, "Stranger", None, 1.0
                 
+            # Run liveness detection check
+            try:
+                from .liveness_detector import LivenessDetector
+                liveness_det = LivenessDetector()
+                is_live, live_conf = liveness_det.is_live(face_crop)
+                if not is_live:
+                    logger.warning(f"Liveness spoof attack detected (confidence: {live_conf:.2f}). Treating as Stranger.")
+                    abs_face_x1 = x1 + fx
+                    abs_face_y1 = y1 + fy
+                    abs_face_x2 = x1 + fx + f_w
+                    abs_face_y2 = y1 + fy + f_h
+                    face_box_norm = [
+                        max(0.0, min(1.0, abs_face_x1 / fw)),
+                        max(0.0, min(1.0, abs_face_y1 / fh)),
+                        max(0.0, min(1.0, abs_face_x2 / fw)),
+                        max(0.0, min(1.0, abs_face_y2 / fh))
+                    ]
+                    return True, face_box_norm, "Stranger", None, 1.0
+            except Exception as le:
+                logger.error(f"Error in liveness detection: {le}")
+                
             # Extract feature
             feat = self.extract_feature(face_crop)
             if feat is None:

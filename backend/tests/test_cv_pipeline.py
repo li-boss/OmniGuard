@@ -391,5 +391,40 @@ class TestCameraPipelineE2E(unittest.TestCase):
         self.assertEqual(emitted_payload["name"], "Bob")
 
 
+class TestLivenessDetector(unittest.TestCase):
+    def test_liveness_invalid_input(self):
+        from core_cv.liveness_detector import LivenessDetector
+        detector = LivenessDetector()
+        
+        # Test None input
+        is_live, score = detector.is_live(None)
+        self.assertFalse(is_live)
+        self.assertEqual(score, 0.0)
+        
+        # Test empty image
+        is_live, score = detector.is_live(np.zeros((0, 0, 3), dtype=np.uint8))
+        self.assertFalse(is_live)
+        self.assertEqual(score, 0.0)
+
+    def test_liveness_spoof_detection(self):
+        from core_cv.liveness_detector import LivenessDetector
+        detector = LivenessDetector(blur_threshold=80.0)
+        
+        # Completely black image should have 0.0 Laplacian variance (blurry / spoof)
+        black_img = np.zeros((112, 112, 3), dtype=np.uint8)
+        is_live, score = detector.is_live(black_img)
+        self.assertFalse(is_live)
+        self.assertLess(score, 1.0)
+        
+        # Low saturation texture (monochromatic dummy face printout)
+        mono_img = np.ones((112, 112, 3), dtype=np.uint8) * 128
+        # Add high frequency noise to bypass blur check, but keep saturation low
+        noise = np.random.randint(-20, 20, (112, 112, 3)).astype(np.int16)
+        mono_img = np.clip(mono_img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        is_live, score = detector.is_live(mono_img)
+        self.assertFalse(is_live)
+        self.assertEqual(score, 0.3)
+
+
 if __name__ == "__main__":
     unittest.main()

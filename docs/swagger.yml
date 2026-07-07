@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: Smart Campus Security API
+  version: 0.1.0
+paths:
+  /api/auth/login:
+    post:
+      summary: Login
+      responses:
+        "200":
+          description: Access token and user profile
+  /api/alarms:
+    get:
+      summary: List alarms
+      responses:
+        "200":
+          description: Alarm list
+  /api/zones:
+    get:
+      summary: List alert zones
+      responses:
+        "200":
+          description: Zone list
+  /api/dashboard/summary:
+    get:
+      summary: Dashboard summary
+      responses:
+        "200":
+          description: Summary metrics

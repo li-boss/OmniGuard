@@ -59,3 +59,4 @@ def create_tables():
 
 if __name__ == "__main__":
     create_tables()
+# 完整上传整个项目所有目录：backend、docs、frontend、ops全套文件

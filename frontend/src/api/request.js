@@ -2,11 +2,11 @@ import axios from 'axios'
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 15000
+  timeout: 12000,
 })
 
 request.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
+  const token = localStorage.getItem('smart-campus-token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -16,9 +16,11 @@ request.interceptors.request.use((config) => {
 request.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    const message = error.response?.data?.message || error.message || 'Request failed'
-    return Promise.reject(new Error(message))
-  }
+    if (error.response?.status === 401) {
+      localStorage.removeItem('smart-campus-token')
+    }
+    return Promise.reject(error)
+  },
 )
 
 export default request

@@ -2,19 +2,32 @@ pipeline {
   agent any
 
   stages {
-    stage('Frontend Build') {
+    stage('Backend Install') {
+      steps {
+        bat 'python -m venv .venv'
+        bat '.venv\\Scripts\\python.exe -m pip install --upgrade pip'
+        bat '.venv\\Scripts\\python.exe -m pip install -r backend\\requirements.txt'
+      }
+    }
+
+    stage('Backend Test') {
+      steps {
+        bat '.venv\\Scripts\\python.exe -m unittest discover -s backend\\tests'
+      }
+    }
+
+    stage('Frontend Install') {
       steps {
         dir('frontend') {
-          sh 'npm install'
-          sh 'npm run build'
+          bat 'npm install'
         }
       }
     }
 
-    stage('Backend Check') {
+    stage('Frontend Build') {
       steps {
-        dir('backend') {
-          sh 'python -m compileall .'
+        dir('frontend') {
+          bat 'npm run build'
         }
       }
     }

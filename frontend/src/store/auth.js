@@ -1,28 +1,40 @@
 import { defineStore } from 'pinia'
-import { login as loginApi, getProfile } from '../api/auth'
+
+import * as authApi from '../api/auth'
+
+const TOKEN_KEY = 'smart-campus-token'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('access_token') || '',
-    user: null
+    token: localStorage.getItem(TOKEN_KEY) || '',
+    user: null,
   }),
-  getters: {
-    isAuthenticated: (state) => Boolean(state.token)
-  },
   actions: {
-    async login(credentials) {
-      const data = await loginApi(credentials)
-      this.token = data.access_token
-      this.user = data.user
-      localStorage.setItem('access_token', data.access_token)
+    setSession(token, user) {
+      this.token = token
+      this.user = user
+      localStorage.setItem(TOKEN_KEY, token)
     },
-    async loadProfile() {
-      this.user = await getProfile()
+    async login(payload) {
+      const result = await authApi.login(payload)
+      this.setSession(result.data.token, result.data.user)
+      return result.data.user
+    },
+    async ensureUser() {
+      if (!this.token) return null
+      try {
+        const result = await authApi.getMe()
+        this.user = result.data
+        return this.user
+      } catch {
+        this.logout()
+        return null
+      }
     },
     logout() {
       this.token = ''
       this.user = null
-      localStorage.removeItem('access_token')
-    }
-  }
+      localStorage.removeItem(TOKEN_KEY)
+    },
+  },
 })

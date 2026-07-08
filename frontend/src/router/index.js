@@ -1,26 +1,53 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+import AlarmHistory from '../views/AlarmHistory.vue'
 import Dashboard from '../views/Dashboard.vue'
 import FaceAccess from '../views/FaceAccess.vue'
+import Login from '../views/Login.vue'
 import PerimeterConfig from '../views/PerimeterConfig.vue'
-import AlarmHistory from '../views/AlarmHistory.vue'
+import { useAuthStore } from '../store/auth'
 
 const routes = [
-  { path: '/', name: 'dashboard', component: Dashboard },
-  { path: '/face-access', name: 'face-access', component: FaceAccess },
-  { path: '/perimeter-config', name: 'perimeter-config', component: PerimeterConfig },
-  { path: '/alarm-history', name: 'alarm-history', component: AlarmHistory }
+  { path: '/', redirect: '/dashboard' },
+  { path: '/login', name: 'login', component: Login, meta: { title: '登录' } },
+  {
+    path: '/dashboard',
+    name: 'dashboard',
+    component: Dashboard,
+    meta: { title: '实时大盘', requiresAuth: true },
+  },
+  {
+    path: '/alarms',
+    name: 'alarms',
+    component: AlarmHistory,
+    meta: { title: '告警历史', requiresAuth: true },
+  },
+  {
+    path: '/zones',
+    name: 'zones',
+    component: PerimeterConfig,
+    meta: { title: '围栏配置', requiresAuth: true },
+  },
+  {
+    path: '/faces',
+    name: 'faces',
+    component: FaceAccess,
+    meta: { title: '人脸管理', requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
 router.beforeEach((to) => {
-  const publicPages = ['dashboard']
-  const token = localStorage.getItem('access_token')
-  if (!token && !publicPages.includes(to.name)) {
-    return { name: 'dashboard' }
+  const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.token) {
+    return '/login'
+  }
+  if (to.name === 'login' && auth.token) {
+    return '/dashboard'
   }
   return true
 })

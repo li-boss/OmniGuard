@@ -1,6 +1,17 @@
 import request from './request'
 
-export const listZones = (params) => request.get('/zones', { params })
-export const createZone = (payload) => request.post('/zones', payload)
-export const updateZone = (id, payload) => request.put(`/zones/${id}`, payload)
-export const deleteZone = (id) => request.delete(`/zones/${id}`)
+export function getZones(params) {
+  return request.get('/zones', { params })
+}
+
+export function createZone(payload) {
+  return request.post('/zones', payload)
+}
+
+export function updateZone(id, payload) {
+  return request.put(`/zones/${id}`, payload)
+}
+
+export function deleteZone(id) {
+  return request.delete(`/zones/${id}`)
+}

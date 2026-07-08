@@ -8,6 +8,32 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const canvas = ref(null)
+const draggingIndex = ref(null)
+
+function getCanvasPoint(event) {
+  const node = canvas.value
+  const rect = node.getBoundingClientRect()
+  return {
+    x: Math.round((event.clientX - rect.left) * (node.width / rect.width)),
+    y: Math.round((event.clientY - rect.top) * (node.height / rect.height)),
+  }
+}
+
+function clampPoint(point) {
+  const node = canvas.value
+  return {
+    x: Math.max(0, Math.min(node.width, point.x)),
+    y: Math.max(0, Math.min(node.height, point.y)),
+  }
+}
+
+function findPointIndex(point) {
+  const hitRadius = 12
+  return props.modelValue.findIndex((item) => {
+    const distance = Math.hypot(item.x - point.x, item.y - point.y)
+    return distance <= hitRadius
+  })
+}
 
 function draw() {
   const node = canvas.value
@@ -57,12 +83,35 @@ function draw() {
   })
 }
 
-function addPoint(event) {
-  const node = canvas.value
-  const rect = node.getBoundingClientRect()
-  const x = Math.round((event.clientX - rect.left) * (node.width / rect.width))
-  const y = Math.round((event.clientY - rect.top) * (node.height / rect.height))
-  emit('update:modelValue', [...props.modelValue, { x, y }])
+function updatePoint(index, point) {
+  const next = props.modelValue.map((item, itemIndex) => (
+    itemIndex === index ? clampPoint(point) : item
+  ))
+  emit('update:modelValue', next)
+}
+
+function startDraw(event) {
+  const point = getCanvasPoint(event)
+  const pointIndex = findPointIndex(point)
+  if (pointIndex >= 0) {
+    draggingIndex.value = pointIndex
+    canvas.value.setPointerCapture?.(event.pointerId)
+    return
+  }
+
+  emit('update:modelValue', [...props.modelValue, clampPoint(point)])
+}
+
+function dragPoint(event) {
+  if (draggingIndex.value === null) return
+  updatePoint(draggingIndex.value, getCanvasPoint(event))
+}
+
+function stopDrag(event) {
+  if (draggingIndex.value !== null) {
+    canvas.value.releasePointerCapture?.(event.pointerId)
+  }
+  draggingIndex.value = null
 }
 
 function undo() {
@@ -79,7 +128,16 @@ onMounted(draw)
 
 <template>
   <div class="canvas-tool">
-    <canvas ref="canvas" width="800" height="450" @click="addPoint" />
+    <canvas
+      ref="canvas"
+      width="800"
+      height="450"
+      @pointerdown="startDraw"
+      @pointermove="dragPoint"
+      @pointerup="stopDrag"
+      @pointercancel="stopDrag"
+      @pointerleave="stopDrag"
+    />
     <div class="canvas-actions">
       <el-tooltip content="撤销" placement="top">
         <el-button :icon="RotateCcw" circle @click="undo" />

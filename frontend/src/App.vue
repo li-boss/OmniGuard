@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Bell,
@@ -13,7 +13,7 @@ import {
 import AlarmPopup from './components/AlarmPopup.vue'
 import { useAuthStore } from './store/auth'
 import { useAlarmsStore } from './store/alarms'
-import { connectAlarmStream } from './services/websocket'
+import { closeAlarmStream, connectAlarmStream } from './services/websocket'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,15 +30,29 @@ const navItems = [
 ]
 
 function logout() {
+  closeAlarmStream()
   auth.logout()
   router.push('/login')
 }
 
-onMounted(async () => {
-  if (auth.token) {
+watch(
+  () => auth.token,
+  async (token) => {
+    if (!token) {
+      closeAlarmStream()
+      return
+    }
+
     await auth.ensureUser()
-    connectAlarmStream(auth.token, (alarm) => alarms.receiveAlarm(alarm))
-  }
+    if (auth.token === token) {
+      connectAlarmStream(token, (alarm) => alarms.receiveAlarm(alarm))
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  closeAlarmStream()
 })
 </script>
 

@@ -1,9 +1,14 @@
 import { io } from 'socket.io-client'
 
 let socket
+let activeToken = ''
 
 export function connectAlarmStream(token, onAlarm) {
-  if (socket?.connected) return socket
+  if (!token) return null
+  if (socket?.connected && activeToken === token) return socket
+  if (socket) closeAlarmStream()
+
+  activeToken = token
 
   socket = io('/', {
     path: '/socket.io',
@@ -26,7 +31,9 @@ export function connectAlarmStream(token, onAlarm) {
 
 export function closeAlarmStream() {
   if (socket) {
+    socket.removeAllListeners()
     socket.close()
     socket = null
   }
+  activeToken = ''
 }

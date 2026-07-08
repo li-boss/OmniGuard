@@ -324,7 +324,7 @@ class CameraPipeline:
 
 class CameraPipelineManager:
     _instance = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __new__(cls, *args, **kwargs):
         with cls._lock:

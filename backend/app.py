@@ -6,15 +6,15 @@ BASE_DIR = Path(__file__).resolve().parent
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
 
+socketio = SocketIO(cors_allowed_origins="*")
+jwt = JWTManager()
+
 from api.dashboard_api import dashboard_bp
 from api.event_api import event_bp
 from api.rule_api import rule_bp, camera_bp
 from api.user_api import auth_bp, user_bp
 from config import Config
 from models import db
-
-socketio = SocketIO(cors_allowed_origins="*")
-jwt = JWTManager()
 
 
 def create_app(config_class=Config):
@@ -90,6 +90,10 @@ def create_app(config_class=Config):
         if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             manager.start()
             atexit.register(manager.stop)
+            
+            from services.scheduler import scheduler_svc
+            scheduler_svc.start()
+            atexit.register(scheduler_svc.stop)
 
     return app
 

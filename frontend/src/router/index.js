@@ -1,14 +1,41 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Dashboard from '../views/Dashboard.vue'
-import FaceAccess from '../views/FaceAccess.vue'
-import PerimeterConfig from '../views/PerimeterConfig.vue'
-import AlarmHistory from '../views/AlarmHistory.vue'
+import Login from '@/views/Login.vue'
 
 const routes = [
-  { path: '/', name: 'dashboard', component: Dashboard },
-  { path: '/face-access', name: 'face-access', component: FaceAccess },
-  { path: '/perimeter-config', name: 'perimeter-config', component: PerimeterConfig },
-  { path: '/alarm-history', name: 'alarm-history', component: AlarmHistory }
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/',
+    redirect: '/dashboard'
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: () => import('@/views/Dashboard.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/alarm-history',
+    name: 'AlarmHistory',
+    component: () => import('@/views/AlarmHistory.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/perimeter-config',
+    name: 'PerimeterConfig',
+    component: () => import('@/views/PerimeterConfig.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/face-access',
+    name: 'FaceAccess',
+    component: () => import('@/views/FaceAccess.vue'),
+    meta: { requiresAuth: true }
+  }
 ]
 
 const router = createRouter({
@@ -16,13 +43,16 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
-  const publicPages = ['dashboard']
-  const token = localStorage.getItem('access_token')
-  if (!token && !publicPages.includes(to.name)) {
-    return { name: 'dashboard' }
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  
+  if (to.meta.requiresAuth && !token) {
+    next('/login')
+  } else if (to.path === '/login' && token) {
+    next('/dashboard')
+  } else {
+    next()
   }
-  return true
 })
 
 export default router

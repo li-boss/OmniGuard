@@ -1,5 +1,21 @@
 import request from './request'
 
-export const getDashboardSummary = () => request.get('/dashboard/summary')
-export const getAlarmTrend = (params) => request.get('/dashboard/alarm-trend', { params })
-export const getDisposalRate = (params) => request.get('/dashboard/disposal-rate', { params })
+/**
+ * 大盘统计接口 - IDashboard
+ * 接口负责人：E
+ * 文件：backend/api/dashboard_api.py
+ * 调用者：A
+ */
+
+export const dashboardApi = {
+  /**
+   * 获取统计数据
+   * GET /api/dashboard/summary
+   */
+  getSummary() {
+    return request({
+      url: '/dashboard/summary',
+      method: 'GET'
+    })
+  }
+}

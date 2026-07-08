@@ -49,6 +49,14 @@ def create_app(config_class=Config):
     app.register_blueprint(event_bp, url_prefix="/api/alarms")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
 
+    from api.face_api import face_bp
+    from api.log_api import log_bp
+    app.register_blueprint(face_bp)
+    app.register_blueprint(log_bp)
+
+    # Ensure directories exist
+    (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
+
     @app.get("/api/system/health")
     def health():
         from datetime import datetime, timezone

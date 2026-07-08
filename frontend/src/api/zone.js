@@ -1,57 +1,17 @@
 import request from './request'
 
-/**
- * 围栏配置接口 - IZone
- * 接口负责人：D
- * 文件：backend/api/rule_api.py, backend/models/zone.py
- * 调用者：A / B / D自己
- */
+export function getZones(params) {
+  return request.get('/zones', { params })
+}
 
-export const zoneApi = {
-  /**
-   * 获取围栏列表
-   * GET /api/zones?camera_id=
-   */
-  getList(params) {
-    return request({
-      url: '/zones',
-      method: 'GET',
-      params
-    })
-  },
+export function createZone(payload) {
+  return request.post('/zones', payload)
+}
 
-  /**
-   * 创建围栏
-   * POST /api/zones
-   */
-  create(data) {
-    return request({
-      url: '/zones',
-      method: 'POST',
-      data
-    })
-  },
+export function updateZone(id, payload) {
+  return request.put(`/zones/${id}`, payload)
+}
 
-  /**
-   * 更新围栏
-   * PUT /api/zones/<id>
-   */
-  update(id, data) {
-    return request({
-      url: `/zones/${id}`,
-      method: 'PUT',
-      data
-    })
-  },
-
-  /**
-   * 删除围栏
-   * DELETE /api/zones/<id>
-   */
-  delete(id) {
-    return request({
-      url: `/zones/${id}`,
-      method: 'DELETE'
-    })
-  }
+export function deleteZone(id) {
+  return request.delete(`/zones/${id}`)
 }

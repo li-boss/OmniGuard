@@ -82,9 +82,22 @@ OmniGuard/
 
 ## 🚀 快速开始
 
-### 1. 环境准备 (Windows / Linux)
-推荐使用 **Python 3.13.12** 作为开发与运行环境。
+### 1. 自动构建与一键运行 (PowerShell 推荐)
+在项目根目录下，您可以直接运行：
+```powershell
+# 一键安装依赖并配置环境
+.\setup.ps1
 
+# 启动前后端服务
+.\start-dev.ps1
+```
+也可以一键执行：
+```powershell
+.\one-click.ps1
+```
+*服务默认地址：前端 `http://127.0.0.1:5173`，后端健康检查 `http://127.0.0.1:5000/api/system/health`。*
+
+### 2. 手动启动后端
 ```bash
 # 进入后端目录
 cd backend
@@ -96,32 +109,31 @@ source venv/bin/activate    # Linux / macOS
 
 # 安装 Python 依赖
 pip install -r requirements.txt
-```
 
-### 2. 模型权重下载
-我们在后端准备了自动权重下载脚本，它会从官方源拉取所需的模型（YOLOv8n、YuNet、MobileFaceNet）：
-```bash
+# 下载权重模型
 python core_cv/weights/download_weights.py
-```
 
-### 3. 本地摄像头 live 检测测试 (推荐优先尝试)
-您可以使用我们提供的可视化测试脚本，直接调用笔记本摄像头或 USB 摄像头，并在屏幕上实时查看人员、人脸的定位标识与运行帧率：
-```bash
-python test_camera.py
-```
-*在视频窗口按下 **`q` 键** 可安全关闭摄像头并退出。*
-
-### 4. 运行全链路自动化测试
-我们在 [test_cv_pipeline.py](file:///g:/vediomis/backend/tests/test_cv_pipeline.py) 中覆盖了 14 项完整功能测试（包含 L2 归一化、RLock 竞态锁、空字典优雅降级、围栏状态转移、SQLite 持久化与 WS 广播 Mock）：
-```bash
-python tests/test_cv_pipeline.py
-```
-
-### 5. 启动 Flask & WebSocket 生产主服务
-```bash
+# 启动 Flask & WebSocket 生产主服务
 python app.py
 ```
-*服务将在端口 `5000` 启动，前端页面可通过 WebSocket 连接订阅 `alarm_event` 频道获取实时告警推送。*
+
+### 3. 手动启动前端
+```bash
+# 进入前端目录
+cd frontend
+
+# 安装依赖
+npm install
+
+# 运行开发服务器
+npm run dev
+```
+
+### 4. 运行全链路测试
+```bash
+cd backend
+python tests/test_cv_pipeline.py
+```
 
 ---
 
@@ -135,23 +147,3 @@ python app.py
 
 ### 2. 摄像头流状态监控
 *   **获取摄像头运行健康指标 (GET)**: `/api/cameras/status`
-    *   **返回格式**：
-        ```json
-        [
-          {
-            "camera_id": "0",
-            "url": "0",
-            "connected": true,
-            "consecutive_failures": 0,
-            "zones_count": 2
-          }
-        ]
-        ```
-
----
-
-## 🛡️ 安全合规与防御
-
-1. **二次翻拍防御**：通过活体防伪检测拦截照片/手机回放导致的越权认证。
-2. **多线程并发防御**：通过数据库写缓冲队列与读写锁防御，防止推理线程与管理线程访问共享内存导致内存段错误崩溃。
-3. **优雅自愈保护**：流获取超时时应用指数退避防止拖慢系统资源，数据库未完成迁移时主服务优雅阻断以保证初始化状态无污染。

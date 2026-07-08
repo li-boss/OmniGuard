@@ -8,6 +8,7 @@ class AlertZone(db.Model):
     camera_id = db.Column(db.String(64), nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     polygon = db.Column(db.JSON, nullable=False)
+    rule_type = db.Column(db.String(64), nullable=True, default="intrusion")
     distance_threshold = db.Column(db.Float, nullable=False, default=0.0)
     stay_seconds = db.Column(db.Integer, nullable=False, default=5)
     enabled = db.Column(db.Boolean, nullable=False, default=True)

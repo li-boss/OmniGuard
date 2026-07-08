@@ -167,7 +167,7 @@ class TestFlaskIntegration(unittest.TestCase):
         # Verify initial cameras status is empty
         response = self.client.get("/api/cameras/status")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, [])
+        self.assertEqual(response.json["data"], [])
         
         # Add a new alert zone
         zone_payload = {
@@ -311,6 +311,8 @@ class TestCameraPipelineE2E(unittest.TestCase):
         with manager._lock:
             manager.pipelines.clear()
             manager.dirty_cameras.clear()
+            CameraPipelineManager._instance = None
+            manager._initialized = False
 
     @patch('core_cv.pipeline.StreamManager')
     @patch('core_cv.pipeline.YoloDetector')

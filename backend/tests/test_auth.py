@@ -8,7 +8,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app import create_app
-from app.extensions import db
+from models import db
 
 
 class AuthTest(unittest.TestCase):

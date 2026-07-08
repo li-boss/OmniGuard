@@ -1,102 +1,120 @@
+import logging
+import requests
 from datetime import datetime
 
-import requests
+from backend.app import db
+from backend.models.alarm import AlarmEvent
 
-from config import DINGTALK_WEBHOOK
-from extensions import db
-from models.alarm import AlarmEvent
+logger = logging.getLogger(__name__)
 
+DINGTALK_WEBHOOK_URL = ''
+ESCALATION_RECIPIENTS = {
+    0: '',
+    1: '',
+    2: '',
+}
 
-LEVEL_MAP = {
-    "low": {
-        "title": "普通告警",
-        "at_all": False
-    },
-    "mid": {
-        "title": "重要告警",
-        "at_all": False
-    },
-    "high": {
-        "title": "紧急告警",
-        "at_all": True
-    }
+SEVERITY_ESCALATION_MAP = {
+    'low': 0,
+    'medium': 1,
+    'high': 2,
+    'critical': 2,
 }
 
 
-def push_dingtalk(alarm, escalation_level="low"):
-    """
-    推送钉钉消息
-    """
+class NotificationService:
 
-    level_info = LEVEL_MAP.get(
-        escalation_level,
-        LEVEL_MAP["low"]
-    )
+    def push_dingtalk(self, alarm, escalation_level=None):
+        if not DINGTALK_WEBHOOK_URL:
+            logger.warning('DingTalk webhook URL not configured, skipping notification')
+            return False
 
-    msg = {
-        "msgtype": "text",
-        "text": {
-            "content": f"""【智慧校园安防-{level_info['title']}】
+        level = escalation_level if escalation_level is not None else alarm.escalation_level
+        severity_emoji = {'low': '🟢', 'medium': '🟡', 'high': '🔴', 'critical': '🚨'}
+        emoji = severity_emoji.get(alarm.severity, '⚠️')
 
-告警ID：{alarm.get('id', '-')}
-
-摄像头：{alarm.get('camera_id', '-')}
-
-类型：{alarm.get('alarm_type', '-')}
-
-时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-描述：{alarm.get('content', '')}
-"""
-        },
-        "at": {
-            "isAtAll": level_info["at_all"]
-        }
-    }
-
-    try:
-        response = requests.post(
-            DINGTALK_WEBHOOK,
-            json=msg,
-            timeout=5
+        title = f'{emoji} 安防告警 - {alarm.type}'
+        text = (
+            f'**告警类型**: {alarm.type}\n\n'
+            f'**严重级别**: {alarm.severity}\n\n'
+            f'**摄像头**: {alarm.camera_id}\n\n'
+            f'**告警时间**: {alarm.created_at.strftime("%Y-%m-%d %H:%M:%S") if alarm.created_at else "N/A"}\n\n'
+            f'**上报级别**: Level {level}\n\n'
+            f'**描述**: {alarm.description or "无"}\n\n'
         )
+        if alarm.snapshot_url:
+            text += f'**截图**: [查看]({alarm.snapshot_url})\n\n'
 
-        return response.json()
+        payload = {
+            'msgtype': 'markdown',
+            'markdown': {
+                'title': title,
+                'text': text,
+            },
+            'at': {
+                'atMobiles': [],
+                'isAtAll': level >= 2,
+            },
+        }
 
-    except Exception as e:
-        print("钉钉发送失败：", e)
-        return None
+        try:
+            resp = requests.post(
+                DINGTALK_WEBHOOK_URL,
+                json=payload,
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                result = resp.json()
+                if result.get('errcode') == 0:
+                    alarm.dingtalk_notified = True
+                    db.session.commit()
+                    logger.info('DingTalk notification sent for alarm %s', alarm.id)
+                    return True
+                else:
+                    logger.error('DingTalk API error: %s', result)
+            else:
+                logger.error('DingTalk HTTP error: %s', resp.status_code)
+        except Exception as e:
+            logger.error('DingTalk notification failed: %s', str(e))
 
-
-def check_escalation(alarm_id):
-    """
-    超时升级
-    """
-
-    alarm = db.session.get(
-        AlarmEvent,
-        alarm_id
-    )
-
-    if alarm is None:
         return False
 
-    delta = datetime.now() - alarm.create_time
+    def check_escalation(self, alarm_id=None):
+        if alarm_id:
+            alarm = AlarmEvent.query.get(alarm_id)
+            if alarm and alarm.should_escalate():
+                return self._escalate_alarm(alarm)
+            return False
 
-    if (
-        delta.total_seconds() > 300
-        and alarm.handle_status == "pending"
-    ):
+        pending_alarms = AlarmEvent.query.filter(
+            AlarmEvent.status.in_(['pending', 'handling']),
+            AlarmEvent.escalation_deadline != None,
+        ).all()
 
-        alarm.severity = "high"
+        escalated = []
+        for alarm in pending_alarms:
+            if alarm.should_escalate():
+                if self._escalate_alarm(alarm):
+                    escalated.append(alarm.id)
+        return escalated
 
-        db.session.commit()
+    def _escalate_alarm(self, alarm):
+        if alarm.escalate():
+            db.session.commit()
+            self.push_dingtalk(alarm, escalation_level=alarm.escalation_level)
+            from backend.services.ws_handler import push_alarm
+            push_alarm(alarm.to_dict())
+            logger.info('Alarm %s escalated to level %d', alarm.id, alarm.escalation_level)
+            return True
+        return False
 
-        push_dingtalk(
-            alarm.to_dict(),
-            escalation_level="high"
-        )
 
-        return True
+notification_svc = NotificationService()
 
-    return False
+
+def push_dingtalk(alarm, escalation_level=None):
+    return notification_svc.push_dingtalk(alarm, escalation_level=escalation_level)
+
+
+def check_escalation(alarm_id=None):
+    return notification_svc.check_escalation(alarm_id=alarm_id)

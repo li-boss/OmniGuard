@@ -1,28 +1,23 @@
-# ==========================
-# Flask 基础配置
-# ==========================
+import os
 
-SECRET_KEY = "smart-campus-alarm-2026-secret"
 
-# ==========================
-# 数据库配置
-# ==========================
+class BaseConfig:
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-secret-change-in-production')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    JSON_SORT_KEYS = False
 
-# SQLite 数据库
-SQLALCHEMY_DATABASE_URI = "sqlite:///smart_campus.db"
-SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-# ==========================
-# SocketIO 配置
-# ==========================
+class DevelopmentConfig(BaseConfig):
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI', 'sqlite:///campus_security.db')
 
-SOCKET_CORS = "*"
 
-# ==========================
-# 钉钉机器人配置
-# ==========================
+class ProductionConfig(BaseConfig):
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI', 'postgresql://user:pass@localhost/campus_security')
 
-# 请替换成你自己的钉钉机器人 Webhook
-DINGTALK_WEBHOOK = (
-    "https://oapi.dingtalk.com/robot/send?access_token=替换成你的token"
-)
+
+class TestingConfig(BaseConfig):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'

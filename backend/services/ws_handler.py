@@ -1,84 +1,49 @@
-from datetime import datetime
-
+import logging
 from flask import request
-from flask_socketio import emit
+from flask_socketio import SocketIO
 
-from extensions import socketio
+logger = logging.getLogger(__name__)
 
-# 摄像头订阅关系
-camera_subscribe = {}
+socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
 
-
-def now_ts():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+_subscribed_cameras = {}
 
 
-@socketio.on("subscribe")
-def handle_subscribe(data):
+@socketio.on('connect')
+def on_connect():
+    logger.info('Client connected: %s', request.sid)
+
+
+@socketio.on('disconnect')
+def on_disconnect():
     sid = request.sid
-    camera_ids = data.get("camera_ids", [])
-
-    for cid in camera_ids:
-        if cid not in camera_subscribe:
-            camera_subscribe[cid] = []
-
-        if sid not in camera_subscribe[cid]:
-            camera_subscribe[cid].append(sid)
-
-    emit(
-        "subscribe_success",
-        {
-            "msg": "订阅成功",
-            "camera_ids": camera_ids
-        }
-    )
+    if sid in _subscribed_cameras:
+        del _subscribed_cameras[sid]
+    logger.info('Client disconnected: %s', sid)
 
 
-@socketio.on("ack")
-def handle_ack(data):
-    alarm_id = data.get("alarm_id")
-    print(f"客户端确认告警：{alarm_id}")
+@socketio.on('subscribe')
+def on_subscribe(data):
+    sid = request.sid
+    camera_ids = data.get('camera_ids', [])
+    _subscribed_cameras[sid] = set(camera_ids)
+    logger.info('Client %s subscribed to cameras: %s', sid, camera_ids)
 
 
-@socketio.on("heartbeat")
-def handle_heartbeat():
-    emit(
-        "heartbeat",
-        {
-            "ts": now_ts()
-        }
-    )
+@socketio.on('ack')
+def on_ack(data):
+    alarm_id = data.get('alarm_id')
+    logger.info('Alarm %s acknowledged by client', alarm_id)
 
 
-def push_alarm(alarm_data):
-    """
-    推送告警
-    """
+def push_alarm(alarm_dict):
+    camera_id = alarm_dict.get('camera_id')
+    for sid, cameras in _subscribed_cameras.items():
+        if not cameras or camera_id in cameras:
+            socketio.emit('alarm', alarm_dict, room=sid)
+    logger.info('Pushed alarm %s to subscribers', alarm_dict.get('id'))
 
-    cid = alarm_data.get("camera_id")
 
-    target_sids = camera_subscribe.get(cid, [])
-
-    alarm_msg = {
-        "id": alarm_data["id"],
-        "camera_id": cid,
-        "type": alarm_data["alarm_type"],
-        "severity": alarm_data["severity"],
-        "content": alarm_data["content"],
-        "time": now_ts()
-    }
-
-    for sid in target_sids:
-        socketio.emit(
-            "alarm",
-            alarm_msg,
-            to=sid
-        )
-
-    # 推送钉钉
-    from services.notification_svc import push_dingtalk
-
-    push_dingtalk(
-        alarm_data,
-        escalation_level=alarm_data["severity"]
-    )
+def push_heartbeat():
+    from datetime import datetime
+    socketio.emit('heartbeat', {'ts': datetime.utcnow().isoformat()})

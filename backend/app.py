@@ -4,9 +4,7 @@ from flask_cors import CORS
 
 BASE_DIR = Path(__file__).resolve().parent
 from flask_jwt_extended import JWTManager
-from flask_socketio import SocketIO
-
-socketio = SocketIO(cors_allowed_origins="*")
+from services.ws_handler import socketio
 jwt = JWTManager()
 
 from api.dashboard_api import dashboard_bp

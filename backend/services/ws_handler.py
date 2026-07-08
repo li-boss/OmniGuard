@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime, timezone
 from flask import request
-from app import socketio
+from flask_socketio import SocketIO
 
 logger = logging.getLogger(__name__)
+
+socketio = SocketIO(cors_allowed_origins="*")
 
 _subscribed_cameras = {}
 

@@ -32,14 +32,7 @@
             登录
           </el-button>
         </el-form-item>
-        <div class="login-tip">
-          <el-alert
-            title="测试模式：输入任意用户名和密码即可登录"
-            type="info"
-            :closable="false"
-            show-icon
-          />
-        </div>
+
       </el-form>
     </div>
   </div>
@@ -49,7 +42,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { authApi, authApiMock } from '@/api/auth'
+import { authApi } from '@/api/auth'
 
 const router = useRouter()
 const loginFormRef = ref(null)
@@ -76,12 +69,7 @@ const handleLogin = async () => {
     if (valid) {
       loading.value = true
       try {
-        /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-        const response = await authApiMock.login(loginForm)
-        /* ========== 模拟API结束 ========== */
-        
-        // 真实API调用（联调时启用）
-        // const response = await authApi.login(loginForm)
+        const response = await authApi.login(loginForm)
         
         localStorage.setItem('token', response.token)
         localStorage.setItem('username', loginForm.username)

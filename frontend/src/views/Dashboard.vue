@@ -62,7 +62,7 @@
 
 <script setup>
 import { reactive, onMounted } from 'vue'
-import { dashboardApi, dashboardApiMock } from '@/api/dashboard'
+import { dashboardApi } from '@/api/dashboard'
 
 const stats = reactive({
   todayAlarms: 0,
@@ -73,12 +73,7 @@ const stats = reactive({
 
 const loadDashboardData = async () => {
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    const data = await dashboardApiMock.getSummary()
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // const data = await dashboardApi.getSummary()
+    const data = await dashboardApi.getSummary()
     
     Object.assign(stats, data)
   } catch (error) {

@@ -132,7 +132,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
-import { alarmApi, alarmApiMock } from '@/api/alarm'
+import { alarmApi } from '@/api/alarm'
 
 const loading = ref(false)
 const dateRange = ref([])
@@ -233,22 +233,12 @@ const handleCurrentChange = () => {
 const loadAlarmList = async () => {
   loading.value = true
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    const response = await alarmApiMock.getList({
+    const response = await alarmApi.getList({
       page: currentPage.value,
       pageSize: pageSize.value,
       type: alarmType.value,
       severity: severity.value
     })
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // const response = await alarmApi.getList({
-    //   page: currentPage.value,
-    //   pageSize: pageSize.value,
-    //   type: alarmType.value,
-    //   severity: severity.value
-    // })
     
     alarmList.value = response.list
     total.value = response.total
@@ -273,12 +263,7 @@ const handleProcess = (row) => {
 
 const handleSubmitProcess = async () => {
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    await alarmApiMock.handle(currentAlarm.value.id, processForm)
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // await alarmApi.handle(currentAlarm.value.id, processForm)
+    await alarmApi.handle(currentAlarm.value.id, processForm)
     
     ElMessage.success('处置成功')
     processDialogVisible.value = false

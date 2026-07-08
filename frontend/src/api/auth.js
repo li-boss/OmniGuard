@@ -44,33 +44,3 @@ export const authApi = {
     })
   }
 }
-
-/* ========== 模拟数据（测试用，联调时删除） ========== */
-export const authApiMock = {
-  async login(data) {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return {
-      token: 'mock-token-' + Date.now(),
-      user: {
-        id: 1,
-        username: data.username,
-        role: 'admin'
-      }
-    }
-  },
-
-  async register(data) {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return {
-      message: '注册成功'
-    }
-  },
-
-  async refresh() {
-    await new Promise(resolve => setTimeout(resolve, 300))
-    return {
-      token: 'mock-token-refreshed-' + Date.now()
-    }
-  }
-}
-/* ========== 模拟数据结束 ========== */

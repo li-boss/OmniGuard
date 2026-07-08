@@ -150,7 +150,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { zoneApi, zoneApiMock } from '@/api/zone'
+import { zoneApi } from '@/api/zone'
 
 const currentCamera = ref(null)
 const cameraTree = ref([])
@@ -202,12 +202,7 @@ const getSeverityTag = (severity) => {
 
 const loadCameraTree = async () => {
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    cameraTree.value = await zoneApiMock.getCameraTree()
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // cameraTree.value = await cameraApi.getTree()
+    cameraTree.value = await zoneApi.getList()
   } catch (error) {
     ElMessage.error('加载摄像头列表失败')
   }
@@ -217,12 +212,7 @@ const loadZoneList = async () => {
   if (!currentCamera.value) return
   
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    zoneList.value = await zoneApiMock.getList({ cameraId: currentCamera.value.id })
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // zoneList.value = await zoneApi.getList({ cameraId: currentCamera.value.id })
+    zoneList.value = await zoneApi.getList({ cameraId: currentCamera.value.id })
   } catch (error) {
     ElMessage.error('加载围栏列表失败')
   }
@@ -259,14 +249,9 @@ const handleToggleZone = async (row) => {
       type: 'warning'
     })
     
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    await zoneApiMock.update(row.id, { 
+    await zoneApi.update(row.id, { 
       status: row.status === 'active' ? 'inactive' : 'active' 
     })
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // await zoneApi.update(row.id, { status: row.status === 'active' ? 'inactive' : 'active' })
     
     ElMessage.success(`${action}成功`)
     loadZoneList()
@@ -283,12 +268,7 @@ const handleDeleteZone = async (row) => {
       type: 'warning'
     })
     
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    await zoneApiMock.delete(row.id)
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // await zoneApi.delete(row.id)
+    await zoneApi.delete(row.id)
     
     ElMessage.success('删除成功')
     loadZoneList()
@@ -305,20 +285,11 @@ const handleSubmitZone = async () => {
   await zoneFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
         if (zoneForm.id) {
-          await zoneApiMock.update(zoneForm.id, zoneForm)
+          await zoneApi.update(zoneForm.id, zoneForm)
         } else {
-          await zoneApiMock.create({ ...zoneForm, cameraId: currentCamera.value.id })
+          await zoneApi.create({ ...zoneForm, cameraId: currentCamera.value.id })
         }
-        /* ========== 模拟API结束 ========== */
-        
-        // 真实API调用（联调时启用）
-        // if (zoneForm.id) {
-        //   await zoneApi.update(zoneForm.id, zoneForm)
-        // } else {
-        //   await zoneApi.create({ ...zoneForm, cameraId: currentCamera.value.id })
-        // }
         
         ElMessage.success('保存成功')
         zoneDialogVisible.value = false

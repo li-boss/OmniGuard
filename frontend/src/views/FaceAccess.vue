@@ -181,7 +181,7 @@
 import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UserFilled, Plus } from '@element-plus/icons-vue'
-import { faceApi, faceApiMock } from '@/api/face'
+import { faceApi } from '@/api/face'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -247,20 +247,11 @@ const beforePhotoUpload = (file) => {
 const loadFaceList = async () => {
   loading.value = true
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    const response = await faceApiMock.getList({
+    const response = await faceApi.getList({
       page: currentPage.value,
       pageSize: pageSize.value,
       keyword: searchKeyword.value
     })
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // const response = await faceApi.getList({
-    //   page: currentPage.value,
-    //   pageSize: pageSize.value,
-    //   keyword: searchKeyword.value
-    // })
     
     faceList.value = response.list
     total.value = response.total
@@ -273,12 +264,7 @@ const loadFaceList = async () => {
 
 const loadStats = async () => {
   try {
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    const data = await faceApiMock.getStats()
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // const data = await faceApi.getStats()
+    const data = await faceApi.getStats()
     
     Object.assign(stats, data)
   } catch (error) {
@@ -311,14 +297,8 @@ const handleViewFace = async (row) => {
   currentFace.value = { ...row, recentLogs: [] }
   detailDialogVisible.value = true
   
-  /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-  const logs = await faceApiMock.getRecognitionLogs(row.id)
+  const logs = await faceApi.getRecognitionLogs(row.id)
   currentFace.value.recentLogs = logs
-  /* ========== 模拟API结束 ========== */
-  
-  // 真实API调用（联调时启用）
-  // const logs = await faceApi.getRecognitionLogs(row.id)
-  // currentFace.value.recentLogs = logs
 }
 
 const handleEditFace = (row) => {
@@ -332,12 +312,7 @@ const handleDeleteFace = async (row) => {
       type: 'warning'
     })
     
-    /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
-    await faceApiMock.delete(row.id)
-    /* ========== 模拟API结束 ========== */
-    
-    // 真实API调用（联调时启用）
-    // await faceApi.delete(row.id)
+    await faceApi.delete(row.id)
     
     ElMessage.success('删除成功')
     loadFaceList()
@@ -356,20 +331,11 @@ const handleSubmitFace = async () => {
     if (valid) {
       submitLoading.value = true
       try {
-        /* ========== 使用模拟API（测试用，联调时改为真实API） ========== */
         if (faceForm.id) {
-          await faceApiMock.update(faceForm.id, faceForm)
+          await faceApi.update(faceForm.id, faceForm)
         } else {
-          await faceApiMock.register(faceForm)
+          await faceApi.register(faceForm)
         }
-        /* ========== 模拟API结束 ========== */
-        
-        // 真实API调用（联调时启用）
-        // if (faceForm.id) {
-        //   await faceApi.update(faceForm.id, faceForm)
-        // } else {
-        //   await faceApi.register(faceForm)
-        // }
         
         ElMessage.success('保存成功')
         faceDialogVisible.value = false

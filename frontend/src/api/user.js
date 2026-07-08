@@ -31,25 +31,3 @@ export const userApi = {
     })
   }
 }
-
-/* ========== 模拟数据（测试用，联调时删除） ========== */
-export const userApiMock = {
-  async getCurrentUser() {
-    await new Promise(resolve => setTimeout(resolve, 300))
-    return {
-      id: 1,
-      username: localStorage.getItem('username') || 'admin',
-      role: 'admin',
-      email: 'admin@example.com',
-      createdAt: '2024-01-01 10:00:00'
-    }
-  },
-
-  async changePassword(data) {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return {
-      message: '密码修改成功'
-    }
-  }
-}
-/* ========== 模拟数据结束 ========== */

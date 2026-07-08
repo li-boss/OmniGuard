@@ -19,30 +19,3 @@ export const dashboardApi = {
     })
   }
 }
-
-/* ========== 模拟数据（测试用，联调时删除） ========== */
-export const dashboardApiMock = {
-  async getSummary() {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return {
-      todayAlarms: 23,
-      activeCameras: 18,
-      recognizedFaces: 156,
-      activeZones: 12,
-      alarmTrend: [
-        { date: '01-15', count: 12 },
-        { date: '01-16', count: 18 },
-        { date: '01-17', count: 15 },
-        { date: '01-18', count: 22 },
-        { date: '01-19', count: 19 },
-        { date: '01-20', count: 23 }
-      ],
-      alarmTypeDistribution: [
-        { type: '人员入侵', count: 45 },
-        { type: '越界行为', count: 32 },
-        { type: '异常聚集', count: 18 }
-      ]
-    }
-  }
-}
-/* ========== 模拟数据结束 ========== */

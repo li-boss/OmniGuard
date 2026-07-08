@@ -39,6 +39,16 @@ def _error(message, status):
     return jsonify({"code": status, "message": message, "data": {}}), status
 
 
+def _parse_bool(value):
+    """兼容 JSON 布尔值和常见字符串布尔值。"""
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 @user_bp.post("/api/auth/register")
 def register():
     """用户注册。"""
@@ -55,7 +65,7 @@ def register():
     user = User(
         username=username,
         real_name=data.get("real_name") or data.get("name"),
-        role=data.get("role", "security"),
+        role="student",
         phone=data.get("phone"),
         department=data.get("department"),
     )
@@ -237,7 +247,7 @@ def update_user(user_id):
     if "department" in data:
         user.department = data.get("department")
     if "is_active" in data:
-        user.is_active = bool(data.get("is_active"))
+        user.is_active = _parse_bool(data.get("is_active"))
     if data.get("password"):
         if len(data["password"]) < 6:
             return _error("密码长度不能少于 6 位", 400)

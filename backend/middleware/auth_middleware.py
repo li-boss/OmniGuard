@@ -13,6 +13,12 @@ from flask import current_app, g, jsonify, request
 from backend.models import User, db
 
 
+def _error(message, status):
+    """统一鉴权错误响应格式。"""
+
+    return jsonify({"code": status, "message": message, "data": {}}), status
+
+
 def generate_token(user, token_type="access"):
     """
     生成 JWT。
@@ -73,20 +79,20 @@ def _load_user_from_token(expected_type):
 
     token = get_token_from_request()
     if not token:
-        return None, (jsonify({"code": 401, "message": "缺少 Bearer Token"}), 401)
+        return None, _error("缺少 Bearer Token", 401)
 
     try:
         payload = decode_token(token, expected_type=expected_type)
     except jwt.ExpiredSignatureError:
-        return None, (jsonify({"code": 401, "message": "登录已过期"}), 401)
+        return None, _error("登录已过期", 401)
     except jwt.InvalidTokenError:
-        return None, (jsonify({"code": 401, "message": "无效 Token"}), 401)
+        return None, _error("无效 Token", 401)
 
     user = db.session.get(User, payload.get("user_id"))
     if not user:
-        return None, (jsonify({"code": 401, "message": "用户不存在"}), 401)
+        return None, _error("用户不存在", 401)
     if not user.is_active:
-        return None, (jsonify({"code": 403, "message": "账号已禁用"}), 403)
+        return None, _error("账号已禁用", 403)
 
     g.current_user = user
     g.jwt_payload = payload
@@ -127,7 +133,7 @@ def role_required(*roles):
         @login_required
         def wrapper(*args, **kwargs):
             if g.current_user.role not in roles:
-                return jsonify({"code": 403, "message": "权限不足"}), 403
+                return _error("权限不足", 403)
             return view_func(*args, **kwargs)
 
         return wrapper

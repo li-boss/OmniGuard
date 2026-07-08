@@ -18,3 +18,4 @@ class Config:
     RTMP_URL = os.getenv("RTMP_URL", "")
     DINGTALK_WEBHOOK = os.getenv("DINGTALK_WEBHOOK", "")
     REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+    ALARM_COOLDOWN_SECONDS = int(os.getenv("ALARM_COOLDOWN_SECONDS", "30"))

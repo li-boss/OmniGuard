@@ -3,6 +3,27 @@ from flask import Blueprint, jsonify, request
 from models import AlertZone, db
 
 rule_bp = Blueprint("rule_api", __name__)
+camera_bp = Blueprint("camera_api", __name__)
+
+
+@camera_bp.get("/status")
+def get_cameras_status():
+    from core_cv.pipeline import CameraPipelineManager
+    manager = CameraPipelineManager()
+    status_list = []
+    
+    # We lock to read pipelines safely
+    with manager._lock:
+        for camera_id, pipeline in manager.pipelines.items():
+            status_list.append({
+                "camera_id": camera_id,
+                "url": str(pipeline.url),
+                "connected": pipeline.stream_manager.connected,
+                "consecutive_failures": pipeline.stream_manager.consecutive_failures,
+                "zones_count": len(pipeline.zones)
+            })
+            
+    return jsonify(status_list)
 
 
 @rule_bp.get("")
@@ -21,6 +42,11 @@ def create_zone():
     zone = AlertZone(**payload)
     db.session.add(zone)
     db.session.commit()
+    
+    # Mark dirty to trigger configuration reload in background thread
+    from core_cv.pipeline import CameraPipelineManager
+    CameraPipelineManager().mark_dirty(zone.camera_id)
+    
     return jsonify(serialize_zone(zone)), 201
 
 
@@ -31,14 +57,25 @@ def update_zone(zone_id):
         if key in (request.get_json() or {}):
             setattr(zone, key, request.json[key])
     db.session.commit()
+    
+    # Mark dirty to trigger configuration reload in background thread
+    from core_cv.pipeline import CameraPipelineManager
+    CameraPipelineManager().mark_dirty(zone.camera_id)
+    
     return jsonify(serialize_zone(zone))
 
 
 @rule_bp.delete("/<int:zone_id>")
 def delete_zone(zone_id):
     zone = AlertZone.query.get_or_404(zone_id)
+    camera_id = zone.camera_id
     db.session.delete(zone)
     db.session.commit()
+    
+    # Mark dirty to trigger configuration reload in background thread
+    from core_cv.pipeline import CameraPipelineManager
+    CameraPipelineManager().mark_dirty(camera_id)
+    
     return "", 204
 
 

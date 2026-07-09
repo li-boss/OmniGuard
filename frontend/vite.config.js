@@ -2,8 +2,6 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
-const apiTarget = process.env.VITE_API_TARGET || 'http://127.0.0.1:5000'
-
 export default defineConfig({
   plugins: [vue()],
   resolve: {
@@ -11,26 +9,27 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src')
     }
   },
-  build: {
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vue: ['vue', 'vue-router', 'pinia'],
-          element: ['element-plus'],
-          socket: ['socket.io-client'],
-        },
-      },
-    },
-  },
   server: {
     port: 3000,
     proxy: {
-      '/api': apiTarget,
-      '/socket.io': {
-        target: apiTarget,
-        ws: true,
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
       },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true
+      }
     },
+    cors: {
+      origin: ['http://localhost:5000', 'http://127.0.0.1:5000'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    }
   },
+  build: {
+    outDir: 'dist',
+    sourcemap: false
+  }
 })

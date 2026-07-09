@@ -1,14 +1,45 @@
-.venv/
-__pycache__/
-*.py[cod]
-*.sqlite
-*.db
-instance/
-.env
 node_modules/
 dist/
 .vite/
-coverage/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+.env
 *.log
+
+backend/core_cv/weights/*
+!backend/core_cv/weights/.gitkeep
+*.pt
+*.onnx
+*.pth
+*.weights
+
+backend/data/*
+!backend/data/.gitkeep
+!backend/data/zones_config.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Docker
+.docker/
+
+# Test & Coverage
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Build artifacts
+*.egg-info/
+dist-packages/

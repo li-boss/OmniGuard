@@ -18,7 +18,8 @@ class Config:
     JSON_AS_ASCII = False
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
     RTMP_BASE_URL = os.getenv("RTMP_BASE_URL", "rtmp://127.0.0.1:1935/live")
-    VIDEO_FEED_URL = os.getenv("VIDEO_FEED_URL", "")
+    VIDEO_SOURCE_URL = os.getenv("VIDEO_SOURCE_URL") or os.getenv("CAMERA_SOURCE_URL") or RTMP_BASE_URL
+    VIDEO_FEED_URL = os.getenv("VIDEO_FEED_URL", "/api/streams/live.mjpg")
     DINGTALK_WEBHOOK = os.getenv("DINGTALK_WEBHOOK", "")
     DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "admin")
     DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")

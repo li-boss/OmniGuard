@@ -42,7 +42,7 @@ if (-not (Test-PortListening $backendPort)) {
         '-ExecutionPolicy',
         'Bypass',
         '-Command',
-        "`$env:API_PORT='$backendPort'; `$env:FRONTEND_ORIGIN='$frontendOrigin'; `$env:VIDEO_FEED_URL='/api/streams/demo.mjpg'; Set-Location '$root\backend'; & '$backendPython' run.py"
+        "`$env:API_PORT='$backendPort'; `$env:FRONTEND_ORIGIN='$frontendOrigin'; Set-Location '$root\backend'; & '$backendPython' run.py"
     )
 }
 

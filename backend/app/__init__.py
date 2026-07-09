@@ -1,4 +1,6 @@
+import atexit
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -48,6 +50,12 @@ def create_app(config_override=None):
 
         db.create_all()
         _seed_admin(app)
+
+    if not app.testing and (not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
+        from .services.scheduler import scheduler_svc
+
+        scheduler_svc.start()
+        atexit.register(scheduler_svc.stop)
 
     return app
 

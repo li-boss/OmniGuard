@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class StreamManager:
-    def __init__(self, url, frame_skip=4):
+    def __init__(self, url, frame_skip=2):
         self.url = url
         self.frame_skip = frame_skip
         self.capture = None

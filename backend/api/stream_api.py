@@ -8,17 +8,34 @@ stream_bp = Blueprint("streams", __name__)
 
 
 def generate_demo_frames():
+    from core_cv.pipeline import CameraPipelineManager
+    manager = CameraPipelineManager()
+
     while True:
-        # Create a techy dark frame (960x540)
+        # Check if there is an active local camera pipeline running
+        # Try to match 'cam-1' (which is the default Selected Camera) or take the first available
+        pipeline = manager.pipelines.get('cam-1') or (list(manager.pipelines.values())[0] if manager.pipelines else None)
+        
+        if pipeline and pipeline.latest_processed_frame is not None:
+            # Retrieve the latest processed frame from the real webcam pipeline (already drawn with overlays)
+            frame_to_stream = pipeline.latest_processed_frame
+            ret, jpeg = cv2.imencode('.jpg', frame_to_stream)
+            if ret:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                # 25 FPS sleep time for real webcam stream
+                time.sleep(0.04)
+                continue
+
+        # FALLBACK: Create a simulated techy dark demo frame (960x540)
         frame = np.zeros((540, 960, 3), dtype=np.uint8)
-        # Background dark grey/blue tone
-        frame[:] = (20, 15, 10)
+        frame[:] = (20, 15, 10)  # Dark background
         
         # 1. Draw border
         cv2.rectangle(frame, (20, 20), (940, 520), (60, 50, 40), 2)
         
         # 2. Camera Title
-        cv2.putText(frame, "CAM-01: CAMPUS MAIN ENTRANCE", (40, 60), 
+        cv2.putText(frame, "CAM-01: CAMPUS MAIN ENTRANCE (DEMO)", (40, 60), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (240, 240, 240), 2)
         
         # 3. Live Indicator with blinking red dot
@@ -65,7 +82,7 @@ def generate_demo_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
         
-        # Maintain 10 FPS
+        # Maintain 10 FPS for fallback
         time.sleep(0.1)
 
 

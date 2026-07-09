@@ -15,3 +15,7 @@ export function handleAlarm(id, payload) {
 export function getAlarmClip(id) {
   return request.get(`/alarms/${id}/clip`)
 }
+
+export function deleteAlarm(id) {
+  return request.delete(`/alarms/${id}`)
+}

@@ -225,6 +225,19 @@ def create_alarm_from_detection(detection_data):
     return alarm
 
 
+@event_bp.route('/<int:alarm_id>', methods=['DELETE'])
+@jwt_required()
+def delete_alarm(alarm_id):
+    alarm = AlarmEvent.query.get_or_404(alarm_id)
+    db.session.delete(alarm)
+    db.session.commit()
+    return jsonify({
+        "code": 0,
+        "message": "ok",
+        "data": None
+    })
+
+
 def serialize_event(event):
     status_map = {
         "resolved": "handled",

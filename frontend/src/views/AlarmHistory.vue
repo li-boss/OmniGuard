@@ -28,6 +28,16 @@ async function handle(row) {
   await load()
 }
 
+async function remove(row) {
+  try {
+    await alarms.delete(row.id)
+    ElMessage.success('告警已删除')
+    await load()
+  } catch (error) {
+    ElMessage.error('删除失败')
+  }
+}
+
 function formatTime(value) {
   return value ? new Date(value).toLocaleString() : '-'
 }
@@ -60,7 +70,7 @@ onMounted(load)
       <el-table-column label="时间" min-width="180">
         <template #default="{ row }">{{ formatTime(row.occurredAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button
             :disabled="row.status === 'handled'"
@@ -69,6 +79,14 @@ onMounted(load)
             @click="handle(row)"
           >
             处置
+          </el-button>
+          <el-button
+            v-if="row.status === 'handled'"
+            size="small"
+            type="danger"
+            @click="remove(row)"
+          >
+            删除
           </el-button>
         </template>
       </el-table-column>

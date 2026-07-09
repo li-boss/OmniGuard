@@ -5,6 +5,7 @@ import threading
 import logging
 import cv2
 import json
+import numpy as np
 from datetime import datetime
 
 from models import db, AlertZone, AlarmEvent
@@ -228,6 +229,7 @@ class CameraPipeline:
         self.zones = []
         
         self.last_clean_time = time.time()
+        self.latest_processed_frame = None
 
     def update_zones(self, zones):
         self.zones = zones
@@ -245,78 +247,109 @@ class CameraPipeline:
             self.rule_engine.cleanup_expired_states()
             self.last_clean_time = now
 
+        # Draw zones and other stuff on drawn_frame
+        drawn_frame = frame.copy()
+        h, w = frame.shape[:2]
+        
+        # Draw zones
+        for zone in self.zones:
+            pts = []
+            for p in zone.get("polygon", []):
+                px = int(p["x"] * w) if p["x"] <= 1.0 else int(p["x"])
+                py = int(p["y"] * h) if p["y"] <= 1.0 else int(p["y"])
+                pts.append([px, py])
+            if pts:
+                pts_arr = np.array(pts, np.int32).reshape((-1, 1, 2))
+                cv2.polylines(drawn_frame, [pts_arr], True, (0, 165, 255), 2)
+                cv2.putText(drawn_frame, zone.get("name", "Zone"), (pts[0][0], pts[0][1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+
         # 1. Person Detection using YOLO
         detections = self.yolo_detector.detect(frame)
-        if not detections:
-            return
+        if detections:
+            # 2. Update simple tracker to get consistent object IDs
+            person_boxes = [det["box"] for det in detections]
+            tracks = self.tracker.update(person_boxes)
 
-        # 2. Update simple tracker to get consistent object IDs
-        person_boxes = [det["box"] for det in detections]
-        tracks = self.tracker.update(person_boxes)
+            # Map tracker outputs to original detections by box match (using IoU)
+            for det in detections:
+                det_box = det["box"]
+                det["object_id"] = None
+                best_iou = 0.0
+                for obj_id, track in tracks.items():
+                    score = iou(track["box"], det_box)
+                    if score > best_iou:
+                        best_iou = score
+                        if score > 0.8:
+                            det["object_id"] = obj_id
 
-        # Map tracker outputs to original detections by box match (using IoU)
-        for det in detections:
-            det_box = det["box"]
-            det["object_id"] = None
-            best_iou = 0.0
-            for obj_id, track in tracks.items():
-                score = iou(track["box"], det_box)
-                if score > best_iou:
-                    best_iou = score
-                    if score > 0.8:
-                        det["object_id"] = obj_id
-
-        # 3. Process each person detection
-        for det in detections:
-            obj_id = det["object_id"]
-            if obj_id is None:
-                continue
-
-            # Run Face detection and recognition inside the person crop
-            face_found, face_box_norm, name, user_id, dist = self.face_recognizer.detect_and_recognize_in_person(
-                frame, det["box"]
-            )
-
-            # 4. Evaluate Alert Zones
-            for zone in self.zones:
-                if not zone.get("enabled", True):
+            # 3. Process each person detection
+            for det in detections:
+                obj_id = det["object_id"]
+                if obj_id is None:
                     continue
 
-                should_trigger, duration = self.rule_engine.evaluate_stay(
-                    object_id=obj_id,
-                    box_norm=det["box_norm"],
-                    zone=zone
+                # Run Face detection and recognition inside the person crop
+                face_found, face_box_norm, name, user_id, dist = self.face_recognizer.detect_and_recognize_in_person(
+                    frame, det["box"]
                 )
 
-                if should_trigger:
-                    logger.warning(f"Stay alert triggered for Object {obj_id} in Zone {zone['name']} (duration: {duration:.1f}s)")
-                    
-                    # Prepare coordinates dict
-                    coordinate_info = {
-                        "person_box": det["box_norm"],
-                        "face_box": face_box_norm if face_found else None
-                    }
-                    
-                    # Push alarm details to queue
-                    alarm_data = {
-                        "alarm_type": "electronic_fence",
-                        "level": "medium" if name != "Stranger" else "high",
-                        "camera_id": self.camera_id,
-                        "coordinate": coordinate_info,
-                        "snapshot_frame": frame.copy(),
-                        "name": name
-                    }
-                    
-                    # Safe put in queue with drop-oldest backpressure strategy
-                    try:
-                        alarm_queue.put_nowait(alarm_data)
-                    except queue.Full:
+                # Draw person box
+                box = det["box"]
+                cv2.rectangle(drawn_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
+                cv2.putText(drawn_frame, f"Person (ID {obj_id})", (int(box[0]), int(box[1]) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 1)
+
+                # Draw face box if found
+                if face_found and face_box_norm:
+                    fx1 = int(face_box_norm[0] * w)
+                    fy1 = int(face_box_norm[1] * h)
+                    fx2 = int(face_box_norm[2] * w)
+                    fy2 = int(face_box_norm[3] * h)
+                    cv2.rectangle(drawn_frame, (fx1, fy1), (fx2, fy2), (255, 180, 0), 2)
+                    cv2.putText(drawn_frame, name, (fx1, fy1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 180, 0), 1)
+
+                # 4. Evaluate Alert Zones
+                for zone in self.zones:
+                    if not zone.get("enabled", True):
+                        continue
+
+                    should_trigger, duration = self.rule_engine.evaluate_stay(
+                        object_id=obj_id,
+                        box_norm=det["box_norm"],
+                        zone=zone
+                    )
+
+                    if should_trigger:
+                        logger.warning(f"Stay alert triggered for Object {obj_id} in Zone {zone['name']} (duration: {duration:.1f}s)")
+                        
+                        coordinate_info = {
+                            "person_box": det["box_norm"],
+                            "face_box": face_box_norm if face_found else None
+                        }
+                        
+                        alarm_data = {
+                            "alarm_type": "electronic_fence",
+                            "level": "medium" if name != "Stranger" else "high",
+                            "camera_id": self.camera_id,
+                            "coordinate": coordinate_info,
+                            "snapshot_frame": frame.copy(),
+                            "name": name
+                        }
+                        
+                        # Safe put in queue
                         try:
-                            # Drop the oldest to make space
-                            alarm_queue.get_nowait()
-                        except queue.Empty:
-                            pass
-                        alarm_queue.put_nowait(alarm_data)
+                            alarm_queue.put_nowait(alarm_data)
+                        except queue.Full:
+                            try:
+                                alarm_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                            alarm_queue.put_nowait(alarm_data)
+
+        # Save to latest_processed_frame
+        self.latest_processed_frame = drawn_frame
 
     def release(self):
         self.stream_manager.release()

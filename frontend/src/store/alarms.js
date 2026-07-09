@@ -28,6 +28,11 @@ export const useAlarmsStore = defineStore('alarms', {
       }
       return result.data
     },
+    async delete(id) {
+      await alarmApi.deleteAlarm(id)
+      this.items = this.items.filter((item) => item.id !== id)
+      this.total = Math.max(0, this.total - 1)
+    },
     receiveAlarm(alarm) {
       if (!alarm?.id) return
       this.popup = alarm

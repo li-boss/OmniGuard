@@ -11,6 +11,7 @@ const form = reactive({
   studentId: '',
   name: '',
   image: '',
+  images: [],
 })
 
 async function load() {
@@ -24,26 +25,43 @@ async function load() {
 }
 
 function pickImage(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    form.image = reader.result
-  }
-  reader.readAsDataURL(file)
+  const files = Array.from(event.target.files || [])
+  if (!files.length) return
+  Promise.all(files.map(readImageFile)).then((images) => {
+    form.images = images
+    form.image = images[0] || ''
+  })
+}
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 async function submit() {
-  if (!form.studentId || !form.name || !form.image) {
+  if (!form.studentId || !form.name || !form.images.length) {
     ElMessage.warning('请补全人脸信息')
     return
   }
   try {
-    await faceApi.registerFace(form)
-    ElMessage.success('人脸已录入')
+    let sampleCount = 0
+    for (const image of form.images) {
+      const result = await faceApi.registerFace({
+        studentId: form.studentId,
+        name: form.name,
+        image,
+      })
+      sampleCount = result.data?.sampleCount || sampleCount
+    }
+    ElMessage.success(`人脸样本已录入，共 ${sampleCount || form.images.length} 组`)
     form.studentId = ''
     form.name = ''
     form.image = ''
+    form.images = []
     await load()
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '人脸录入失败')
@@ -74,7 +92,7 @@ onMounted(load)
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="照片">
-          <input accept="image/*" type="file" @change="pickImage" />
+          <input accept="image/*" multiple type="file" @change="pickImage" />
         </el-form-item>
       </el-form>
       <img v-if="form.image" class="preview-image" :src="form.image" alt="预览" />

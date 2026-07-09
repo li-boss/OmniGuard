@@ -11,6 +11,26 @@ face_bp = Blueprint("faces", __name__)
 face_recognizer = FaceRecognizer()
 
 
+def _normalize_features(value):
+    if _is_feature_vector(value):
+        return [[round(float(item), 8) for item in value]]
+    if isinstance(value, list):
+        return [
+            [round(float(item), 8) for item in feature]
+            for feature in value
+            if _is_feature_vector(feature)
+        ]
+    return []
+
+
+def _is_feature_vector(value):
+    return (
+        isinstance(value, list)
+        and len(value) == SFACE_FEATURE_DIM
+        and all(isinstance(item, (int, float)) for item in value)
+    )
+
+
 @face_bp.get("")
 @auth_required
 def list_faces():
@@ -42,18 +62,23 @@ def register_face():
     if not student_id or (not image and not feature_data):
         return error("studentId/user_id and image/feature_data are required", 400)
 
-    feature = feature_data if feature_data is not None else face_recognizer.extract_feature(image, allow_fallback=False)
-    if not feature:
+    features = (
+        _normalize_features(feature_data)
+        if feature_data is not None
+        else face_recognizer.extract_features(image, allow_fallback=False)
+    )
+    if not features:
         return error(
             "No clear frontal face was detected in the image. Please upload a brighter, sharper face photo.",
             422,
             {"reason": "face_not_detected", "model": face_recognizer.model_name},
         )
-    if len(feature) != SFACE_FEATURE_DIM:
+    invalid = [len(feature) for feature in features if len(feature) != SFACE_FEATURE_DIM]
+    if invalid:
         return error(
             "Face feature dimension is incompatible with the current SFace model.",
             422,
-            {"reason": "feature_dimension_mismatch", "expected": SFACE_FEATURE_DIM, "actual": len(feature)},
+            {"reason": "feature_dimension_mismatch", "expected": SFACE_FEATURE_DIM, "actual": invalid[0]},
         )
 
     face = FaceRecord.query.filter_by(student_id=student_id).first()
@@ -64,9 +89,11 @@ def register_face():
     face.name = name
     if image:
         face.image_preview = image if image.startswith("data:") else f"data:image/jpeg;base64,{image}"
-    face.set_feature(feature)
+    added = face.add_features(features)
     db.session.commit()
-    return success(face.to_dict(), "face registered", 201)
+    data = face.to_dict()
+    data["addedSamples"] = added
+    return success(data, "face registered", 201)
 
 
 @face_bp.get("/features")
@@ -79,6 +106,7 @@ def list_face_features():
                 **face.to_dict(),
                 "featureData": face.get_feature(),
                 "feature_data": face.get_feature(),
+                "features": face.get_features(),
             }
             for face in faces
         ],

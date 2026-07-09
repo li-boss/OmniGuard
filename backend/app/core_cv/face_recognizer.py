@@ -24,6 +24,7 @@ YUNET_REGISTRATION_THRESHOLD = 0.45
 SFACE_COSINE_THRESHOLD = 0.363
 SFACE_DISTANCE_THRESHOLD = 1.0 - SFACE_COSINE_THRESHOLD
 SFACE_FEATURE_DIM = 128
+REGISTRATION_FEATURE_VARIANTS = 4
 
 
 class FaceRecognizer:
@@ -41,20 +42,31 @@ class FaceRecognizer:
             self.haar_detector = cv2.CascadeClassifier(cascade_path)
 
     def extract_feature(self, image_data, allow_fallback=True):
+        features = self.extract_features(image_data, allow_fallback=allow_fallback, max_features=1)
+        return features[0] if features else None
+
+    def extract_features(self, image_data, allow_fallback=True, max_features=REGISTRATION_FEATURE_VARIANTS):
         image = self._decode_image(image_data)
         if image is None:
-            return self._fallback_feature(image_data) if allow_fallback else None
+            fallback = self._fallback_feature(image_data) if allow_fallback else None
+            return [fallback] if fallback else []
 
+        features = []
         for candidate in self._registration_variants(image):
             face = self._largest_face(candidate, score_threshold=YUNET_REGISTRATION_THRESHOLD)
             if face is None:
                 continue
 
-            feature = self._feature_from_face(candidate, face)
-            if feature is not None:
-                return feature
+            for variant in self._appearance_variants(candidate):
+                feature = self._feature_from_face(variant, face)
+                if feature is not None and self._append_unique_feature(features, feature):
+                    if len(features) >= max_features:
+                        return features
 
-        return self._fallback_feature(image_data) if allow_fallback else None
+        if features:
+            return features
+        fallback = self._fallback_feature(image_data) if allow_fallback else None
+        return [fallback] if fallback else []
 
     def detect_faces(self, frame):
         return [item["box"] for item in self.detect_faces_detailed(frame)]
@@ -135,13 +147,13 @@ class FaceRecognizer:
         best = None
         best_distance = None
         for face in known_faces:
-            other = face.get("feature") or []
-            if len(other) != len(feature):
-                continue
-            distance = self._cosine_distance(feature, other)
-            if best_distance is None or distance < best_distance:
-                best = face
-                best_distance = distance
+            for other in self._candidate_features(face):
+                if len(other) != len(feature):
+                    continue
+                distance = self._cosine_distance(feature, other)
+                if best_distance is None or distance < best_distance:
+                    best = face
+                    best_distance = distance
 
         if best is not None and best_distance is not None and best_distance <= threshold:
             return best, best_distance
@@ -216,6 +228,25 @@ class FaceRecognizer:
             for scaled in self._scaled_variants(variant):
                 yield scaled
 
+    def _appearance_variants(self, image):
+        yield image
+        if cv2 is None:
+            return
+
+        bright = cv2.convertScaleAbs(image, alpha=1.08, beta=8)
+        dark = cv2.convertScaleAbs(image, alpha=0.92, beta=-8)
+        yield bright
+        yield dark
+
+        try:
+            lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+            lightness, channel_a, channel_b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = cv2.merge((clahe.apply(lightness), channel_a, channel_b))
+            yield cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+        except Exception:
+            return
+
     def _scaled_variants(self, image):
         height, width = image.shape[:2]
         if height <= 0 or width <= 0:
@@ -285,6 +316,32 @@ class FaceRecognizer:
             return 1.0
         similarity = dot / (math.sqrt(left_norm) * math.sqrt(right_norm))
         return float(1.0 - similarity)
+
+    def _candidate_features(self, face):
+        features = face.get("features")
+        if isinstance(features, list):
+            for feature in features:
+                if self._is_feature_vector(feature):
+                    yield feature
+
+        feature = face.get("feature")
+        if self._is_feature_vector(feature):
+            yield feature
+
+    def _append_unique_feature(self, features, feature):
+        if not self._is_feature_vector(feature):
+            return False
+        if any(self._cosine_distance(feature, other) < 0.005 for other in features):
+            return False
+        features.append(feature)
+        return True
+
+    def _is_feature_vector(self, value):
+        return (
+            isinstance(value, list)
+            and len(value) == SFACE_FEATURE_DIM
+            and all(isinstance(item, (int, float)) for item in value)
+        )
 
     def _ensure_model_file(self, path, url, min_bytes):
         if path.exists() and path.stat().st_size >= min_bytes:

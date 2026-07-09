@@ -129,6 +129,7 @@ class CVPipelineTest(unittest.TestCase):
         feature = recognizer.extract_feature("data:image/jpeg;base64,ZmFrZQ==")
         self.assertIsInstance(feature, list)
         self.assertEqual(len(feature), SFACE_FEATURE_DIM)
+        self.assertEqual(len(recognizer.extract_features("data:image/jpeg;base64,ZmFrZQ==")), 1)
         self.assertTrue(recognizer.compare(feature, feature)["matched"])
         self.assertEqual(recognizer.detect_and_recognize_in_person(None, [0, 0, 1, 1])[2], "Stranger")
 
@@ -147,6 +148,38 @@ class CVPipelineTest(unittest.TestCase):
         self.assertEqual(result.json["data"]["reason"], "face_not_detected")
         with self.app.app_context():
             self.assertEqual(FaceRecord.query.count(), 0)
+
+    def test_register_face_accumulates_multiple_samples(self):
+        first_feature = [1.0] + [0.0] * (SFACE_FEATURE_DIM - 1)
+        second_feature = [0.0, 1.0] + [0.0] * (SFACE_FEATURE_DIM - 2)
+
+        first = self.client.post("/api/faces/register", headers=self.headers, json={
+            "studentId": "S002",
+            "name": "Multi Sample",
+            "featureData": first_feature,
+        })
+        second = self.client.post("/api/faces/register", headers=self.headers, json={
+            "studentId": "S002",
+            "name": "Multi Sample",
+            "featureData": second_feature,
+        })
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.json["data"]["sampleCount"], 2)
+
+        with self.app.app_context():
+            record = FaceRecord.query.filter_by(student_id="S002").one()
+            self.assertEqual(len(record.get_features()), 2)
+            recognizer = FaceRecognizer()
+            matched, distance = recognizer.match(second_feature, [{
+                "id": record.id,
+                "name": record.name,
+                "features": record.get_features(),
+            }])
+
+        self.assertEqual(matched["name"], "Multi Sample")
+        self.assertEqual(distance, 0.0)
 
 
 if __name__ == "__main__":

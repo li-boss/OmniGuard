@@ -175,18 +175,19 @@ def _known_faces():
     changed = False
     records = FaceRecord.query.order_by(FaceRecord.id.asc()).all()
     for record in records:
-        feature = record.get_feature()
-        if (not feature or len(feature) != SFACE_FEATURE_DIM) and record.image_preview:
-            feature = _face_recognizer.extract_feature(record.image_preview, allow_fallback=False)
-            if feature:
-                record.set_feature(feature)
+        features = record.get_features()
+        if (not features or any(len(feature) != SFACE_FEATURE_DIM for feature in features)) and record.image_preview:
+            features = _face_recognizer.extract_features(record.image_preview, allow_fallback=False)
+            if features:
+                record.set_features(features)
                 changed = True
-        if feature:
+        if features:
             items.append({
                 "id": record.id,
                 "studentId": record.student_id,
                 "name": record.name,
-                "feature": feature,
+                "feature": features[0],
+                "features": features,
             })
     if changed:
         db.session.commit()

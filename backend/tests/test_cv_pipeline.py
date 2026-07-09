@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -11,6 +13,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app import create_app
 from app.core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
+from app.core_cv.fall_detector import FallDetector
 from app.core_cv.liveness_detector import LivenessDetector
 from app.core_cv.pipeline import CameraPipelineManager, DetectionPipeline, SimpleTracker, iou
 from app.core_cv.rule_engine import RuleEngine
@@ -85,6 +88,41 @@ class CVPipelineTest(unittest.TestCase):
             })
         self.assertEqual(len(result["alarms"]), 1)
         self.assertEqual(result["alarms"][0]["cameraId"], "cam-1")
+
+    def test_fall_detector_heuristic(self):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        detector = FallDetector(confirm_frames=1, use_hog=False)
+
+        upright = detector.detect_frame(frame, detections=[{
+            "box": [260, 90, 340, 430],
+            "className": "person",
+            "confidence": 0.9,
+        }])
+        fallen = detector.detect_frame(frame, detections=[{
+            "box": [120, 330, 500, 430],
+            "className": "person",
+            "confidence": 0.9,
+        }])
+
+        self.assertEqual(upright, [])
+        self.assertEqual(len(fallen), 1)
+        self.assertEqual(fallen[0]["eventType"], "fall")
+        self.assertGreaterEqual(fallen[0]["confidence"], 0.58)
+
+    def test_detection_pipeline_creates_fall_alarm(self):
+        with self.app.app_context():
+            result = DetectionPipeline().process_frame("cam-1", {
+                "detections": [{
+                    "box": [120, 330, 500, 430],
+                    "className": "person",
+                    "confidence": 0.91,
+                    "severity": "high",
+                }],
+            })
+
+        self.assertEqual(len(result["alarms"]), 1)
+        self.assertEqual(result["alarms"][0]["eventType"], "fall")
+        self.assertEqual(result["alarms"][0]["severity"], "high")
 
     def test_face_and_liveness_helpers(self):
         recognizer = FaceRecognizer()

@@ -3,6 +3,7 @@ import threading
 import time
 
 from .face_recognizer import FaceRecognizer
+from .fall_detector import FallDetector
 from .model_loader import ModelLoader
 from .rule_engine import RuleEngine
 from .stream_manager import StreamManager
@@ -67,6 +68,7 @@ class DetectionPipeline:
     def __init__(self):
         self.model_loader = ModelLoader()
         self.detector = YOLODetector(self.model_loader.get_yolo())
+        self.fall_detector = FallDetector(confirm_frames=1, use_hog=False)
         self.rule_engine = RuleEngine()
 
     def process_frame(self, camera_id, frame):
@@ -75,6 +77,18 @@ class DetectionPipeline:
         detections = self.detector.detect_frame(frame)
         zones = Zone.query.filter_by(camera_id=str(camera_id), enabled=True).all()
         alarms = []
+
+        for fall in self.fall_detector.detect_frame(frame, detections=detections):
+            alarm = create_alarm({
+                "cameraId": str(camera_id),
+                "eventType": "fall",
+                "title": "疑似摔倒",
+                "description": "Fall detector generated alarm",
+                "severity": fall.get("severity", "high"),
+                "confidence": fall.get("confidence"),
+                "detectionData": fall,
+            })
+            alarms.append(alarm.to_dict())
 
         for detection in detections:
             hits = self.rule_engine.evaluate_detection(detection, zones)
@@ -133,6 +147,7 @@ class CameraPipeline:
         self.rule_engine = rule_engine or RuleEngine()
         self.stream_manager = StreamManager(url)
         self.yolo_detector = YOLODetector()
+        self.fall_detector = FallDetector(confirm_frames=2, use_hog=False)
         self.tracker = SimpleTracker()
         self.zones = []
 
@@ -145,6 +160,9 @@ class CameraPipeline:
             return
 
         detections = self.yolo_detector.detect(frame)
+        for fall in self.fall_detector.detect_frame(frame, detections=detections):
+            self._queue_fall_alarm(fall)
+
         tracks = self.tracker.update([detection["box"] for detection in detections if "box" in detection])
         for detection in detections:
             box = detection.get("box")
@@ -173,6 +191,27 @@ class CameraPipeline:
             "camera_id": self.camera_id,
             "coordinate": {"box": detection.get("box_norm") or detection.get("box"), "duration": duration},
             "description": f"Object stayed in {zone.get('name', 'zone')} for {duration:.1f}s",
+        }
+        try:
+            alarm_queue.put_nowait(alarm_data)
+        except queue.Full:
+            try:
+                alarm_queue.get_nowait()
+            except queue.Empty:
+                pass
+            alarm_queue.put_nowait(alarm_data)
+
+    def _queue_fall_alarm(self, fall):
+        alarm_data = {
+            "alarm_type": "fall",
+            "level": fall.get("severity", "high"),
+            "camera_id": self.camera_id,
+            "coordinate": {
+                "box": fall.get("box_norm") or fall.get("box"),
+                "reason": fall.get("reason"),
+                "confidence": fall.get("confidence"),
+            },
+            "description": "Fall detector generated alarm",
         }
         try:
             alarm_queue.put_nowait(alarm_data)

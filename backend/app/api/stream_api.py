@@ -7,13 +7,16 @@ import time
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
 from ..core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
+from ..core_cv.fall_detector import FallDetector
 from ..extensions import db
 from ..models import FaceRecord
 
 
 stream_bp = Blueprint("streams", __name__)
 _face_recognizer = FaceRecognizer()
+_fall_detector = FallDetector(confirm_frames=int(os.getenv("FALL_CONFIRM_FRAMES", "2")))
 _face_cache = {"loaded_at": 0.0, "items": []}
+_fall_alarm_state = {"last_alarm_at": 0.0}
 
 
 try:
@@ -143,6 +146,26 @@ def _draw_text(frame, text, position, font_size=24, color=(255, 255, 255)):
     cv2.putText(frame, text, (x, y + font_size), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2, cv2.LINE_AA)
 
 
+def _draw_box_label(frame, box, label, color, font_size=24):
+    x1, y1, x2, y2 = [int(round(value)) for value in box]
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(frame.shape[1] - 1, x2)
+    y2 = min(frame.shape[0] - 1, y2)
+    if x2 <= x1 or y2 <= y1:
+        return
+
+    text_width, text_height = _text_size(label, font_size=font_size)
+    label_height = max(34, text_height + 14)
+    label_width = max(x2 - x1, text_width + 18, 150)
+    label_top = max(0, y1 - label_height)
+    text_top = label_top + max(4, (label_height - text_height) // 2 - 1)
+
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+    cv2.rectangle(frame, (x1, label_top), (min(frame.shape[1] - 1, x1 + label_width), y1), color, -1)
+    _draw_text(frame, label, (x1 + 8, text_top), font_size=font_size, color=(18, 24, 32))
+
+
 def _known_faces():
     now = time.time()
     if now - _face_cache["loaded_at"] < 3:
@@ -173,7 +196,27 @@ def _known_faces():
     return items
 
 
-def _annotate_frame(frame):
+def _maybe_create_fall_alarm(fall, source):
+    cooldown = max(5, int(os.getenv("FALL_ALARM_COOLDOWN_SECONDS", "30")))
+    now = time.time()
+    if now - _fall_alarm_state["last_alarm_at"] < cooldown:
+        return
+
+    from .event_api import create_alarm
+
+    create_alarm({
+        "cameraId": str(source),
+        "eventType": "fall",
+        "title": "疑似摔倒",
+        "description": f"实时视频检测到疑似摔倒：{fall.get('reason')}",
+        "severity": fall.get("severity", "high"),
+        "confidence": fall.get("confidence"),
+        "detectionData": fall,
+    })
+    _fall_alarm_state["last_alarm_at"] = now
+
+
+def _annotate_frame(frame, source):
     known_faces = _known_faces()
     detections = _face_recognizer.recognize_frame(frame, known_faces=known_faces)
     for detection in detections:
@@ -183,18 +226,16 @@ def _annotate_frame(frame):
         label = detection["name"]
         if detection["distance"] is not None:
             label = f"{label} {detection['confidence']:.0%}"
-        text_width, text_height = _text_size(label, font_size=24)
-        label_height = max(34, text_height + 14)
-        label_width = max(width, text_width + 18, 180)
-        label_top = max(0, y - label_height)
-        text_top = label_top + max(4, (label_height - text_height) // 2 - 1)
+        _draw_box_label(frame, [x, y, x + width, y + height], label, color, font_size=24)
 
-        cv2.rectangle(frame, (x, y), (x + width, y + height), color, 2)
-        cv2.rectangle(frame, (x, label_top), (x + label_width, y), color, -1)
-        _draw_text(frame, label, (x + 8, text_top), font_size=24, color=(18, 24, 32))
+    falls = _fall_detector.detect_frame(frame)
+    for fall in falls:
+        label = f"摔倒 {fall['confidence']:.0%}"
+        _draw_box_label(frame, fall["box"], label, (42, 60, 229), font_size=26)
+        _maybe_create_fall_alarm(fall, source)
 
-    status = f"{_face_recognizer.model_name}  known={len(known_faces)}  detected={len(detections)}"
-    cv2.rectangle(frame, (16, 16), (520, 54), (17, 24, 32), -1)
+    status = f"{_face_recognizer.model_name}  known={len(known_faces)}  detected={len(detections)}  falls={len(falls)}"
+    cv2.rectangle(frame, (16, 16), (610, 54), (17, 24, 32), -1)
     cv2.putText(frame, status, (28, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (104, 209, 157), 2, cv2.LINE_AA)
     return frame
 
@@ -253,7 +294,7 @@ def _jpeg_stream(source):
             continue
 
         try:
-            frame = _annotate_frame(frame)
+            frame = _annotate_frame(frame, source)
         except Exception as exc:
             current_app.logger.warning("Face annotation failed: %s", exc)
 

@@ -38,12 +38,16 @@ async function submit() {
     ElMessage.warning('请补全人脸信息')
     return
   }
-  await faceApi.registerFace(form)
-  ElMessage.success('人脸已录入')
-  form.studentId = ''
-  form.name = ''
-  form.image = ''
-  await load()
+  try {
+    await faceApi.registerFace(form)
+    ElMessage.success('人脸已录入')
+    form.studentId = ''
+    form.name = ''
+    form.image = ''
+    await load()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '人脸录入失败')
+  }
 }
 
 async function remove(face) {

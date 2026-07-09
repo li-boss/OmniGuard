@@ -15,6 +15,7 @@ from app.core_cv.liveness_detector import LivenessDetector
 from app.core_cv.pipeline import CameraPipelineManager, DetectionPipeline, SimpleTracker, iou
 from app.core_cv.rule_engine import RuleEngine
 from app.extensions import db
+from app.models import FaceRecord
 
 
 class CVPipelineTest(unittest.TestCase):
@@ -96,6 +97,18 @@ class CVPipelineTest(unittest.TestCase):
         detector = LivenessDetector()
         self.assertEqual(detector.is_live(None), (False, 0.0))
         self.assertEqual(detector.is_live({"isLive": True}), (True, 1.0))
+
+    def test_register_face_rejects_image_without_detectable_face(self):
+        result = self.client.post("/api/faces/register", headers=self.headers, json={
+            "studentId": "S001",
+            "name": "Test User",
+            "image": "data:image/jpeg;base64,ZmFrZQ==",
+        })
+
+        self.assertEqual(result.status_code, 422)
+        self.assertEqual(result.json["data"]["reason"], "face_not_detected")
+        with self.app.app_context():
+            self.assertEqual(FaceRecord.query.count(), 0)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 
-from ..core_cv.face_recognizer import FaceRecognizer
+from ..core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
 from ..extensions import db
 from ..middleware.auth_middleware import auth_required
 from ..models import FaceRecord
@@ -42,7 +42,20 @@ def register_face():
     if not student_id or (not image and not feature_data):
         return error("studentId/user_id and image/feature_data are required", 400)
 
-    feature = feature_data if feature_data is not None else face_recognizer.extract_feature(image)
+    feature = feature_data if feature_data is not None else face_recognizer.extract_feature(image, allow_fallback=False)
+    if not feature:
+        return error(
+            "No clear frontal face was detected in the image. Please upload a brighter, sharper face photo.",
+            422,
+            {"reason": "face_not_detected", "model": face_recognizer.model_name},
+        )
+    if len(feature) != SFACE_FEATURE_DIM:
+        return error(
+            "Face feature dimension is incompatible with the current SFace model.",
+            422,
+            {"reason": "feature_dimension_mismatch", "expected": SFACE_FEATURE_DIM, "actual": len(feature)},
+        )
+
     face = FaceRecord.query.filter_by(student_id=student_id).first()
     if face is None:
         face = FaceRecord(student_id=student_id, name=name)

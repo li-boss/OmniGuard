@@ -19,13 +19,15 @@ YUNET_MODEL = WEIGHTS_DIR / "face_detection_yunet_2023mar.onnx"
 SFACE_MODEL = WEIGHTS_DIR / "face_recognition_sface_2021dec.onnx"
 YUNET_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
 SFACE_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
+YUNET_DETECTION_THRESHOLD = 0.62
+YUNET_REGISTRATION_THRESHOLD = 0.45
 SFACE_COSINE_THRESHOLD = 0.363
 SFACE_DISTANCE_THRESHOLD = 1.0 - SFACE_COSINE_THRESHOLD
 SFACE_FEATURE_DIM = 128
 
 
 class FaceRecognizer:
-    _model_lock = threading.Lock()
+    _model_lock = threading.RLock()
 
     def __init__(self, app=None, threshold=SFACE_DISTANCE_THRESHOLD):
         self.app = app
@@ -38,22 +40,26 @@ class FaceRecognizer:
             cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
             self.haar_detector = cv2.CascadeClassifier(cascade_path)
 
-    def extract_feature(self, image_data):
+    def extract_feature(self, image_data, allow_fallback=True):
         image = self._decode_image(image_data)
         if image is None:
-            return self._fallback_feature(image_data)
+            return self._fallback_feature(image_data) if allow_fallback else None
 
-        face = self._largest_face(image)
-        if face is None:
-            return None
+        for candidate in self._registration_variants(image):
+            face = self._largest_face(candidate, score_threshold=YUNET_REGISTRATION_THRESHOLD)
+            if face is None:
+                continue
 
-        feature = self._feature_from_face(image, face)
-        return feature if feature is not None else self._fallback_feature(image_data)
+            feature = self._feature_from_face(candidate, face)
+            if feature is not None:
+                return feature
+
+        return self._fallback_feature(image_data) if allow_fallback else None
 
     def detect_faces(self, frame):
         return [item["box"] for item in self.detect_faces_detailed(frame)]
 
-    def detect_faces_detailed(self, frame):
+    def detect_faces_detailed(self, frame, score_threshold=YUNET_DETECTION_THRESHOLD):
         if cv2 is None or frame is None or getattr(frame, "size", 0) == 0:
             return []
 
@@ -61,8 +67,13 @@ class FaceRecognizer:
         if models:
             detector, _recognizer = models
             height, width = frame.shape[:2]
-            detector.setInputSize((width, height))
-            _retval, faces = detector.detect(frame)
+            with self._model_lock:
+                detector.setInputSize((width, height))
+                if hasattr(detector, "setScoreThreshold"):
+                    detector.setScoreThreshold(float(score_threshold))
+                _retval, faces = detector.detect(frame)
+                if hasattr(detector, "setScoreThreshold"):
+                    detector.setScoreThreshold(float(YUNET_DETECTION_THRESHOLD))
             if faces is None:
                 return []
             result = []
@@ -188,9 +199,41 @@ class FaceRecognizer:
         crop = frame[y:y + height, x:x + width]
         return self._fallback_feature(crop)
 
-    def _largest_face(self, image):
-        faces = self.detect_faces_detailed(image)
+    def _largest_face(self, image, score_threshold=YUNET_DETECTION_THRESHOLD):
+        faces = self.detect_faces_detailed(image, score_threshold=score_threshold)
         return faces[0] if faces else None
+
+    def _registration_variants(self, image):
+        variants = [image]
+        if cv2 is not None:
+            variants.extend([
+                cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE),
+                cv2.rotate(image, cv2.ROTATE_180),
+                cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE),
+            ])
+        for variant in variants:
+            yield variant
+            for scaled in self._scaled_variants(variant):
+                yield scaled
+
+    def _scaled_variants(self, image):
+        height, width = image.shape[:2]
+        if height <= 0 or width <= 0:
+            return
+
+        max_side = max(height, width)
+        min_side = min(height, width)
+        scales = []
+        if max_side > 1280:
+            scales.append(1280.0 / max_side)
+        if min_side < 360:
+            scales.append(min(360.0 / min_side, 1280.0 / max_side))
+
+        for scale in scales:
+            if abs(scale - 1.0) < 0.01:
+                continue
+            new_size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+            yield cv2.resize(image, new_size, interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC)
 
     def _decode_image(self, image_data):
         if cv2 is None or np is None or image_data is None:

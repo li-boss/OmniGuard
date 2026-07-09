@@ -75,7 +75,7 @@ def _known_faces():
     for record in records:
         feature = record.get_feature()
         if (not feature or len(feature) != SFACE_FEATURE_DIM) and record.image_preview:
-            feature = _face_recognizer.extract_feature(record.image_preview)
+            feature = _face_recognizer.extract_feature(record.image_preview, allow_fallback=False)
             if feature:
                 record.set_feature(feature)
                 changed = True

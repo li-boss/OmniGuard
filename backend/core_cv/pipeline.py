@@ -405,7 +405,9 @@ class CameraPipelineManager:
                     # Get enabled zones for this camera
                     zones = AlertZone.query.filter_by(camera_id=camera_id, enabled=True).all()
                     
-                    if not zones:
+                    # We always want 'cam-1' to run even if there are no zones,
+                    # so that the stream is always active and viewable by default!
+                    if not zones and camera_id != 'cam-1':
                         # No active zones, release pipeline if exists
                         if camera_id in self.pipelines:
                             logger.info(f"No active zones for camera {camera_id}. Releasing pipeline.")
@@ -452,6 +454,10 @@ class CameraPipelineManager:
                 # Get unique camera_ids from AlertZone
                 camera_ids = [r[0] for r in db.session.query(AlertZone.camera_id).distinct().all()]
                 
+                # Always ensure 'cam-1' is initialized and running
+                if 'cam-1' not in camera_ids:
+                    camera_ids.append('cam-1')
+                    
                 with self._lock:
                     self.dirty_cameras.update(camera_ids)
                     

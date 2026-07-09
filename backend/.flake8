@@ -1,3 +1,14 @@
 [flake8]
 max-line-length = 100
-exclude = .venv,__pycache__,instance
+extend-ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    backend/core_cv/weights,
+    backend/data,
+    node_modules
+max-complexity = 10
+per-file-ignores =
+    __init__.py: F401

@@ -1,14 +1,28 @@
 import base64
 import hashlib
+import math
 
 
 class FaceRecognizer:
+    def __init__(self, app=None, threshold=0.6):
+        self.app = app
+        self.threshold = threshold
+
     def extract_feature(self, image_data):
-        raw = image_data.split(",", 1)[-1] if isinstance(image_data, str) else ""
-        try:
-            payload = base64.b64decode(raw + "===")
-        except Exception:
-            payload = raw.encode("utf-8", errors="ignore")
+        if image_data is None:
+            return None
+        if hasattr(image_data, "size") and image_data.size == 0:
+            return None
+        if isinstance(image_data, str):
+            raw = image_data.split(",", 1)[-1]
+            try:
+                payload = base64.b64decode(raw + "===")
+            except Exception:
+                payload = raw.encode("utf-8", errors="ignore")
+        elif hasattr(image_data, "tobytes"):
+            payload = image_data.tobytes()
+        else:
+            payload = str(image_data).encode("utf-8", errors="ignore")
 
         digest = hashlib.sha256(payload).digest()
         return [round(value / 255, 6) for value in digest[:32]]
@@ -27,3 +41,13 @@ class FaceRecognizer:
         if best is not None and best_distance is not None and best_distance <= threshold:
             return best, best_distance
         return None, best_distance
+
+    def compare(self, known_feature, candidate_feature, threshold=None):
+        threshold = threshold if threshold is not None else self.threshold
+        if not known_feature or not candidate_feature or len(known_feature) != len(candidate_feature):
+            return {"matched": False, "distance": 1.0}
+        distance = math.sqrt(sum((float(a) - float(b)) ** 2 for a, b in zip(known_feature, candidate_feature)))
+        return {"matched": distance <= threshold, "distance": distance}
+
+    def detect_and_recognize_in_person(self, frame, person_box):
+        return False, None, "Stranger", None, 1.0

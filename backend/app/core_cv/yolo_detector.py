@@ -6,3 +6,9 @@ class YOLODetector:
         if isinstance(frame, dict) and frame.get("detections"):
             return frame["detections"]
         return []
+
+    def detect(self, frame):
+        return self.detect_frame(frame)
+
+
+YoloDetector = YOLODetector

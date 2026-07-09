@@ -10,6 +10,7 @@ class Zone(db.Model):
     name = db.Column(db.String(100), nullable=False)
     rule_type = db.Column(db.String(32), nullable=False, default="intrusion")
     points_json = db.Column(db.Text, nullable=False, default="[]")
+    stay_seconds = db.Column(db.Integer, nullable=False, default=5)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(
         db.DateTime,
@@ -30,6 +31,8 @@ class Zone(db.Model):
             "name": self.name,
             "ruleType": self.rule_type,
             "points": self.get_points(),
+            "staySeconds": self.stay_seconds,
+            "stay_seconds": self.stay_seconds,
             "enabled": self.enabled,
             "createdAt": self.created_at.isoformat(),
         }

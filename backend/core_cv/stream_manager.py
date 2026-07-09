@@ -24,9 +24,26 @@ class StreamManager:
         
         logger.info(f"Connecting to video stream: {self.url} ...")
         try:
-            self.capture = cv2.VideoCapture(self.url)
+            url_str = str(self.url)
+            if url_str.isdigit():
+                camera_idx = int(self.url)
+                # Try DirectShow first on Windows
+                self.capture = cv2.VideoCapture(camera_idx, cv2.CAP_DSHOW)
+                if not self.capture.isOpened():
+                    self.capture = cv2.VideoCapture(camera_idx)
+                
+                # If camera 0 failed, try camera 1 as fallback
+                if not self.capture.isOpened() and camera_idx == 0:
+                    logger.info("Camera 0 failed to open. Trying Camera 1 as fallback...")
+                    self.capture = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+                    if not self.capture.isOpened():
+                        self.capture = cv2.VideoCapture(1)
+            else:
+                self.capture = cv2.VideoCapture(self.url)
+
             # Set buffer size to 1 to get latest frames
-            self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            if self.capture.isOpened():
+                self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if self.capture.isOpened():
                 self.connected = True
                 self.consecutive_failures = 0

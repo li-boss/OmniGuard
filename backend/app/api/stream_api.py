@@ -1,6 +1,7 @@
 from datetime import datetime
 import html
 import os
+from pathlib import Path
 import time
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
@@ -17,8 +18,20 @@ _face_cache = {"loaded_at": 0.0, "items": []}
 
 try:
     import cv2
+    import numpy as np
 except ImportError:  # pragma: no cover - exercised only when optional runtime dep is absent
     cv2 = None
+    np = None
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:  # pragma: no cover - optional text rendering dependency
+    Image = None
+    ImageDraw = None
+    ImageFont = None
+
+
+_FONT_CACHE = {}
 
 
 def _svg_response(title, message, status=200):
@@ -64,6 +77,72 @@ def _open_capture(source):
     return capture
 
 
+def _contains_non_ascii(text):
+    return any(ord(char) > 127 for char in str(text))
+
+
+def _font_path():
+    candidates = [
+        Path("C:/Windows/Fonts/NotoSansSC-VF.ttf"),
+        Path("C:/Windows/Fonts/msyh.ttc"),
+        Path("C:/Windows/Fonts/simhei.ttf"),
+        Path("C:/Windows/Fonts/simsun.ttc"),
+        Path("C:/Windows/Fonts/Deng.ttf"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _load_font(size):
+    if ImageFont is None:
+        return None
+    if size in _FONT_CACHE:
+        return _FONT_CACHE[size]
+
+    path = _font_path()
+    if path is None:
+        return None
+    font = ImageFont.truetype(str(path), size=size)
+    _FONT_CACHE[size] = font
+    return font
+
+
+def _text_size(text, font_size=24):
+    text = str(text)
+    if ImageDraw is not None and _contains_non_ascii(text):
+        font = _load_font(font_size)
+        if font is not None:
+            canvas = Image.new("RGB", (1, 1))
+            draw = ImageDraw.Draw(canvas)
+            left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+            return right - left, bottom - top
+
+    scale = font_size / 34.0
+    (width, height), _baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 2)
+    return width, height
+
+
+def _draw_text(frame, text, position, font_size=24, color=(255, 255, 255)):
+    text = str(text)
+    x, y = position
+    if Image is not None and ImageDraw is not None and np is not None and _contains_non_ascii(text):
+        font = _load_font(font_size)
+        if font is not None:
+            image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(image)
+            draw.text((x, y), text, font=font, fill=(color[2], color[1], color[0]))
+            frame[:] = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            return
+
+    scale = font_size / 34.0
+    cv2.putText(frame, text, (x, y + font_size), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2, cv2.LINE_AA)
+
+
 def _known_faces():
     now = time.time()
     if now - _face_cache["loaded_at"] < 3:
@@ -104,9 +183,15 @@ def _annotate_frame(frame):
         label = detection["name"]
         if detection["distance"] is not None:
             label = f"{label} {detection['confidence']:.0%}"
+        text_width, text_height = _text_size(label, font_size=24)
+        label_height = max(34, text_height + 14)
+        label_width = max(width, text_width + 18, 180)
+        label_top = max(0, y - label_height)
+        text_top = label_top + max(4, (label_height - text_height) // 2 - 1)
+
         cv2.rectangle(frame, (x, y), (x + width, y + height), color, 2)
-        cv2.rectangle(frame, (x, max(0, y - 34)), (x + max(width, 180), y), color, -1)
-        cv2.putText(frame, label, (x + 8, max(22, y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (18, 24, 32), 2, cv2.LINE_AA)
+        cv2.rectangle(frame, (x, label_top), (x + label_width, y), color, -1)
+        _draw_text(frame, label, (x + 8, text_top), font_size=24, color=(18, 24, 32))
 
     status = f"{_face_recognizer.model_name}  known={len(known_faces)}  detected={len(detections)}"
     cv2.rectangle(frame, (16, 16), (520, 54), (17, 24, 32), -1)

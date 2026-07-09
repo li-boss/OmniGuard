@@ -1,15 +1,21 @@
+import click
+
 from app import create_app
-from models import db
-
-app = create_app()
+from app.extensions import db
 
 
-@app.cli.command("init-db")
+@click.group()
+def cli():
+    pass
+
+
+@cli.command("init-db")
 def init_db():
-    db.create_all()
-    print("Database initialized.")
+    app = create_app()
+    with app.app_context():
+        db.create_all()
+    click.echo("database initialized")
 
 
-@app.cli.command("seed")
-def seed():
-    print("Seed command placeholder.")
+if __name__ == "__main__":
+    cli()

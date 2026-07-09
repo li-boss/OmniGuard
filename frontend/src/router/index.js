@@ -1,58 +1,55 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from '@/views/Login.vue'
+
+import AlarmHistory from '../views/AlarmHistory.vue'
+import Dashboard from '../views/Dashboard.vue'
+import FaceAccess from '../views/FaceAccess.vue'
+import Login from '../views/Login.vue'
+import PerimeterConfig from '../views/PerimeterConfig.vue'
+import { useAuthStore } from '../store/auth'
 
 const routes = [
-  {
-    path: '/login',
-    name: 'Login',
-    component: Login,
-    meta: { requiresAuth: false }
-  },
-  {
-    path: '/',
-    redirect: '/dashboard'
-  },
+  { path: '/', redirect: '/dashboard' },
+  { path: '/login', name: 'login', component: Login, meta: { title: '登录' } },
   {
     path: '/dashboard',
-    name: 'Dashboard',
-    component: () => import('@/views/Dashboard.vue'),
-    meta: { requiresAuth: true }
+    name: 'dashboard',
+    component: Dashboard,
+    meta: { title: '实时大盘', requiresAuth: true },
   },
   {
-    path: '/alarm-history',
-    name: 'AlarmHistory',
-    component: () => import('@/views/AlarmHistory.vue'),
-    meta: { requiresAuth: true }
+    path: '/alarms',
+    name: 'alarms',
+    component: AlarmHistory,
+    meta: { title: '告警历史', requiresAuth: true },
   },
   {
-    path: '/perimeter-config',
-    name: 'PerimeterConfig',
-    component: () => import('@/views/PerimeterConfig.vue'),
-    meta: { requiresAuth: true }
+    path: '/zones',
+    name: 'zones',
+    component: PerimeterConfig,
+    meta: { title: '围栏配置', requiresAuth: true },
   },
   {
-    path: '/face-access',
-    name: 'FaceAccess',
-    component: () => import('@/views/FaceAccess.vue'),
-    meta: { requiresAuth: true }
-  }
+    path: '/faces',
+    name: 'faces',
+    component: FaceAccess,
+    meta: { title: '人脸管理', requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
-  
-  if (to.meta.requiresAuth && !token) {
-    next('/login')
-  } else if (to.path === '/login' && token) {
-    next('/dashboard')
-  } else {
-    next()
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.token) {
+    return '/login'
   }
+  if (to.name === 'login' && auth.token) {
+    return '/dashboard'
+  }
+  return true
 })
 
 export default router

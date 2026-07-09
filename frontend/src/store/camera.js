@@ -1,18 +1,24 @@
 import { defineStore } from 'pinia'
-import { listZones } from '../api/zone'
 
 export const useCameraStore = defineStore('camera', {
   state: () => ({
-    activeCameraId: '',
-    zones: []
+    selectedCameraId: 'cam-1',
+    cameras: [
+      {
+        id: 'cam-1',
+        name: '校园主入口',
+        streamUrl: '/api/streams/demo.mjpg',
+      },
+    ],
   }),
-  actions: {
-    setActiveCamera(cameraId) {
-      this.activeCameraId = cameraId
+  getters: {
+    selectedCamera(state) {
+      return state.cameras.find((camera) => camera.id === state.selectedCameraId) || state.cameras[0]
     },
-    async fetchZones(params = {}) {
-      const data = await listZones(params)
-      this.zones = data.items || data
-    }
-  }
+  },
+  actions: {
+    select(cameraId) {
+      this.selectedCameraId = cameraId
+    },
+  },
 })

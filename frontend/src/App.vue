@@ -1,143 +1,101 @@
-<template>
-  <router-view v-if="$route.path === '/login'" />
-  <el-container v-else class="app-container">
-    <el-header class="app-header">
-      <div class="header-left">
-        <h1>智慧校园安防系统</h1>
-      </div>
-      <div class="header-right">
-        <el-dropdown>
-          <span class="user-info">
-            <el-icon><User /></el-icon>
-            {{ username }}
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
-    </el-header>
-    
-    <el-container>
-      <el-aside width="200px" class="app-aside">
-        <el-menu
-          :default-active="$route.path"
-          router
-          class="aside-menu"
-        >
-          <el-menu-item index="/dashboard">
-            <el-icon><DataLine /></el-icon>
-            <span>数据概览</span>
-          </el-menu-item>
-          <el-menu-item index="/alarm-history">
-            <el-icon><Bell /></el-icon>
-            <span>告警历史</span>
-          </el-menu-item>
-          <el-menu-item index="/perimeter-config">
-            <el-icon><Setting /></el-icon>
-            <span>围栏配置</span>
-          </el-menu-item>
-          <el-menu-item index="/face-access">
-            <el-icon><UserFilled /></el-icon>
-            <span>人脸管理</span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
-      
-      <el-main class="app-main">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
-</template>
-
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { User, DataLine, Bell, Setting, UserFilled } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Bell,
+  ChartNoAxesCombined,
+  LogOut,
+  Map,
+  ShieldCheck,
+  Users,
+} from '@lucide/vue'
 
+import AlarmPopup from './components/AlarmPopup.vue'
+import { useAuthStore } from './store/auth'
+import { useAlarmsStore } from './store/alarms'
+import { closeAlarmStream, connectAlarmStream } from './services/websocket'
+
+const route = useRoute()
 const router = useRouter()
-const username = ref('管理员')
+const auth = useAuthStore()
+const alarms = useAlarmsStore()
 
-onMounted(() => {
-  const storedUsername = localStorage.getItem('username')
-  if (storedUsername) {
-    username.value = storedUsername
-  }
-})
+const isLogin = computed(() => route.name === 'login')
 
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('username')
+const navItems = [
+  { path: '/dashboard', label: '大盘', icon: ChartNoAxesCombined },
+  { path: '/alarms', label: '告警', icon: Bell },
+  { path: '/zones', label: '围栏', icon: Map },
+  { path: '/faces', label: '人脸', icon: Users },
+]
+
+function logout() {
+  closeAlarmStream()
+  auth.logout()
   router.push('/login')
 }
+
+watch(
+  () => auth.token,
+  async (token) => {
+    if (!token) {
+      closeAlarmStream()
+      return
+    }
+
+    await auth.ensureUser()
+    if (auth.token === token) {
+      connectAlarmStream(token, (alarm) => alarms.receiveAlarm(alarm))
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  closeAlarmStream()
+})
 </script>
 
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+<template>
+  <router-view v-if="isLogin" />
 
-body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
-}
+  <div v-else class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <ShieldCheck />
+        <strong>智慧校园安防</strong>
+      </div>
 
-#app {
-  width: 100vw;
-  height: 100vh;
-}
-</style>
+      <nav class="nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          class="nav-item"
+          :to="item.path"
+        >
+          <component :is="item.icon" />
+          <span>{{ item.label }}</span>
+        </router-link>
+      </nav>
 
-<style scoped>
-.app-container {
-  width: 100%;
-  height: 100vh;
-}
+      <button class="logout-button" type="button" @click="logout">
+        <LogOut />
+        <span>退出</span>
+      </button>
+    </aside>
 
-.app-header {
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px;
-}
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Smart Campus Security</p>
+          <h1>{{ route.meta.title }}</h1>
+        </div>
+        <div class="user-pill">{{ auth.user?.username || 'operator' }}</div>
+      </header>
 
-.header-left h1 {
-  font-size: 20px;
-  color: #303133;
-  margin: 0;
-}
+      <router-view />
+    </main>
 
-.header-right {
-  display: flex;
-  align-items: center;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  color: #606266;
-}
-
-.app-aside {
-  background: #fff;
-  border-right: 1px solid #e4e7ed;
-}
-
-.aside-menu {
-  border: none;
-}
-
-.app-main {
-  background: #f0f2f5;
-  padding: 20px;
-}
-</style>
+    <AlarmPopup />
+  </div>
+</template>

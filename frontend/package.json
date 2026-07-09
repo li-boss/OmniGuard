@@ -1,23 +1,27 @@
 {
-  "name": "smart-campus-security",
-  "version": "1.0.0",
-  "description": "智慧校园安防系统前端",
+  "name": "smart-campus-security-frontend",
+  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest"
   },
   "dependencies": {
-    "vue": "3.3.4",
-    "vue-router": "4.2.4",
-    "pinia": "2.1.4",
-    "element-plus": "2.3.14",
-    "axios": "1.5.1",
-    "socket.io-client": "4.6.1"
+    "axios": "^1.7.9",
+    "element-plus": "^2.9.3",
+    "@lucide/vue": "^1.23.0",
+    "pinia": "^2.3.1",
+    "socket.io-client": "^4.8.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "4.3.4",
-    "vite": "4.4.9"
+    "@vitejs/plugin-vue": "^6.0.0",
+    "jsdom": "^25.0.1",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.10"
   }
 }

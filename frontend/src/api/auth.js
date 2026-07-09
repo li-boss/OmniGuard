@@ -1,46 +1,21 @@
 import request from './request'
 
-/**
- * 鉴权接口 - IAuth
- * 接口负责人：C
- * 文件：backend/api/user_api.py, backend/middleware/auth_middleware.py
- * 调用者：A / B
- */
+export function login(payload) {
+  return request.post('/auth/login', payload)
+}
 
-export const authApi = {
-  /**
-   * 用户注册
-   * POST /api/auth/register
-   */
-  register(data) {
-    return request({
-      url: '/auth/register',
-      method: 'POST',
-      data
-    })
-  },
+export function register(payload) {
+  return request.post('/auth/register', payload)
+}
 
-  /**
-   * 用户登录
-   * POST /api/auth/login
-   * @returns {token: string, user: object}
-   */
-  login(data) {
-    return request({
-      url: '/auth/login',
-      method: 'POST',
-      data
-    })
-  },
+export function refreshToken() {
+  return request.post('/auth/refresh')
+}
 
-  /**
-   * 刷新token
-   * POST /api/auth/refresh
-   */
-  refresh() {
-    return request({
-      url: '/auth/refresh',
-      method: 'POST'
-    })
-  }
+export function getMe() {
+  return request.get('/users/me')
+}
+
+export function changePassword(payload) {
+  return request.put('/users/me/password', payload)
 }

@@ -1,3 +1,3 @@
-import { createPinia as createPiniaRoot } from 'pinia'
-
-export const createPinia = () => createPiniaRoot()
+export { useAlarmsStore } from './alarms'
+export { useAuthStore } from './auth'
+export { useCameraStore } from './camera'

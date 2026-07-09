@@ -230,6 +230,7 @@ class CameraPipeline:
         
         self.last_clean_time = time.time()
         self.latest_processed_frame = None
+        self.frame_lock = threading.Lock()
 
     def update_zones(self, zones):
         self.zones = zones
@@ -348,8 +349,9 @@ class CameraPipeline:
                                 pass
                             alarm_queue.put_nowait(alarm_data)
 
-        # Save to latest_processed_frame
-        self.latest_processed_frame = drawn_frame
+        # Save to latest_processed_frame (with lock and copy to prevent thread race condition)
+        with self.frame_lock:
+            self.latest_processed_frame = drawn_frame.copy()
 
     def release(self):
         self.stream_manager.release()

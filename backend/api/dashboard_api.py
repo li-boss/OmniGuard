@@ -104,7 +104,7 @@ def get_summary():
             "alarmCount": total_alarms,
             "pendingAlarmCount": pending_alarms,
             "rtmpBaseUrl": "rtmp://127.0.0.1:1935/live",
-            "videoFeedUrl": "0",
+            "videoFeedUrl": "/api/streams/demo.mjpg",
             "severity": severity_distribution,
             "trend": trend_data_b,
             "recentAlarms": [serialize_event(alarm) for alarm in recent_alarms],

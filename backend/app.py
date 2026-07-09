@@ -49,8 +49,10 @@ def create_app(config_class=Config):
 
     from api.face_api import face_bp
     from api.log_api import log_bp
+    from api.stream_api import stream_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(log_bp)
+    app.register_blueprint(stream_bp, url_prefix="/api/streams")
 
     # Ensure directories exist
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)

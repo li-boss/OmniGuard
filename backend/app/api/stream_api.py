@@ -5,7 +5,7 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
-from ..core_cv.face_recognizer import FaceRecognizer
+from ..core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
 from ..extensions import db
 from ..models import FaceRecord
 
@@ -74,7 +74,7 @@ def _known_faces():
     records = FaceRecord.query.order_by(FaceRecord.id.asc()).all()
     for record in records:
         feature = record.get_feature()
-        if (not feature or len(feature) < 128) and record.image_preview:
+        if (not feature or len(feature) != SFACE_FEATURE_DIM) and record.image_preview:
             feature = _face_recognizer.extract_feature(record.image_preview)
             if feature:
                 record.set_feature(feature)
@@ -96,7 +96,7 @@ def _known_faces():
 
 def _annotate_frame(frame):
     known_faces = _known_faces()
-    detections = _face_recognizer.recognize_frame(frame, known_faces=known_faces, threshold=0.58)
+    detections = _face_recognizer.recognize_frame(frame, known_faces=known_faces)
     for detection in detections:
         x, y, width, height = detection["box"]
         matched = detection["matched"]
@@ -108,8 +108,8 @@ def _annotate_frame(frame):
         cv2.rectangle(frame, (x, max(0, y - 34)), (x + max(width, 180), y), color, -1)
         cv2.putText(frame, label, (x + 8, max(22, y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (18, 24, 32), 2, cv2.LINE_AA)
 
-    status = f"Face AI ON  known={len(known_faces)}  detected={len(detections)}"
-    cv2.rectangle(frame, (16, 16), (430, 54), (17, 24, 32), -1)
+    status = f"{_face_recognizer.model_name}  known={len(known_faces)}  detected={len(detections)}"
+    cv2.rectangle(frame, (16, 16), (520, 54), (17, 24, 32), -1)
     cv2.putText(frame, status, (28, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (104, 209, 157), 2, cv2.LINE_AA)
     return frame
 

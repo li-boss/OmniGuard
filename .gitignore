@@ -10,5 +10,6 @@ dist/
 .vite/
 coverage/
 *.log
+backend/app/core_cv/weights/*.onnx
 .DS_Store
 Thumbs.db

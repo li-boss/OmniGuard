@@ -10,7 +10,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app import create_app
-from app.core_cv.face_recognizer import FaceRecognizer
+from app.core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
 from app.core_cv.liveness_detector import LivenessDetector
 from app.core_cv.pipeline import CameraPipelineManager, DetectionPipeline, SimpleTracker, iou
 from app.core_cv.rule_engine import RuleEngine
@@ -89,6 +89,7 @@ class CVPipelineTest(unittest.TestCase):
         recognizer = FaceRecognizer()
         feature = recognizer.extract_feature("data:image/jpeg;base64,ZmFrZQ==")
         self.assertIsInstance(feature, list)
+        self.assertEqual(len(feature), SFACE_FEATURE_DIM)
         self.assertTrue(recognizer.compare(feature, feature)["matched"])
         self.assertEqual(recognizer.detect_and_recognize_in_person(None, [0, 0, 1, 1])[2], "Stranger")
 

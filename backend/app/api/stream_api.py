@@ -5,8 +5,14 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
+from ..core_cv.face_recognizer import FaceRecognizer
+from ..extensions import db
+from ..models import FaceRecord
+
 
 stream_bp = Blueprint("streams", __name__)
+_face_recognizer = FaceRecognizer()
+_face_cache = {"loaded_at": 0.0, "items": []}
 
 
 try:
@@ -56,6 +62,56 @@ def _open_capture(source):
     except Exception:
         pass
     return capture
+
+
+def _known_faces():
+    now = time.time()
+    if now - _face_cache["loaded_at"] < 3:
+        return _face_cache["items"]
+
+    items = []
+    changed = False
+    records = FaceRecord.query.order_by(FaceRecord.id.asc()).all()
+    for record in records:
+        feature = record.get_feature()
+        if (not feature or len(feature) < 128) and record.image_preview:
+            feature = _face_recognizer.extract_feature(record.image_preview)
+            if feature:
+                record.set_feature(feature)
+                changed = True
+        if feature:
+            items.append({
+                "id": record.id,
+                "studentId": record.student_id,
+                "name": record.name,
+                "feature": feature,
+            })
+    if changed:
+        db.session.commit()
+
+    _face_cache["loaded_at"] = now
+    _face_cache["items"] = items
+    return items
+
+
+def _annotate_frame(frame):
+    known_faces = _known_faces()
+    detections = _face_recognizer.recognize_frame(frame, known_faces=known_faces, threshold=0.58)
+    for detection in detections:
+        x, y, width, height = detection["box"]
+        matched = detection["matched"]
+        color = (67, 214, 139) if matched else (64, 167, 255)
+        label = detection["name"]
+        if detection["distance"] is not None:
+            label = f"{label} {detection['confidence']:.0%}"
+        cv2.rectangle(frame, (x, y), (x + width, y + height), color, 2)
+        cv2.rectangle(frame, (x, max(0, y - 34)), (x + max(width, 180), y), color, -1)
+        cv2.putText(frame, label, (x + 8, max(22, y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (18, 24, 32), 2, cv2.LINE_AA)
+
+    status = f"Face AI ON  known={len(known_faces)}  detected={len(detections)}"
+    cv2.rectangle(frame, (16, 16), (430, 54), (17, 24, 32), -1)
+    cv2.putText(frame, status, (28, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (104, 209, 157), 2, cv2.LINE_AA)
+    return frame
 
 
 def _mjpeg_part(jpeg_bytes):
@@ -111,6 +167,11 @@ def _jpeg_stream(source):
             time.sleep(0.2)
             continue
 
+        try:
+            frame = _annotate_frame(frame)
+        except Exception as exc:
+            current_app.logger.warning("Face annotation failed: %s", exc)
+
         ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
         if not ok:
             continue
@@ -164,6 +225,7 @@ def stream_status():
             "source": str(source),
             "detail": detail,
             "feedUrl": current_app.config.get("VIDEO_FEED_URL"),
+            "knownFaces": len(_known_faces()) if available else 0,
         },
         "message": "ok" if available else "camera unavailable",
     }), 200 if available else 503

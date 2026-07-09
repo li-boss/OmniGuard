@@ -78,7 +78,29 @@ class StreamManager:
         self.index += 1
         skip_frame = (self.index % self.frame_skip != 0)
 
-        # 3. Non-blocking frame flushing (Get-Latest-Frame strategy)
+        # 3. For local webcams, bypass the grab loop to prevent blocking or driver issues
+        if str(self.url).isdigit():
+            try:
+                ok, frame = self.capture.read()
+                if ok and frame is not None:
+                    self.consecutive_failures = 0
+                    self.connected = True
+                    if skip_frame:
+                        return None
+                    return frame
+                else:
+                    self.consecutive_failures += 1
+                    if self.consecutive_failures > 5:
+                        self.connected = False
+                        logger.error(f"Stream {self.url} disconnected due to consecutive retrieval failures")
+                    return None
+            except Exception as e:
+                logger.error(f"Error reading frame from local camera {self.url}: {e}")
+                self.consecutive_failures += 1
+                self.connected = False
+                return None
+
+        # 4. Non-blocking frame flushing (Get-Latest-Frame strategy)
         # We grab all buffered frames, keeping only the last one
         last_frame = None
         grabbed_any = False

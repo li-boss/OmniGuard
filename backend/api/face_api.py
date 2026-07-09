@@ -109,17 +109,20 @@ def register_face():
         detector.setInputSize((w, h))
         retval, faces = detector.detect(img)
         if faces is not None and len(faces) > 0:
-            fx, fy, fw_f, fh_f = map(int, faces[0][0:4])
-            pad_w = int(fw_f * 0.15)
-            pad_h = int(fh_f * 0.15)
-            
-            face_x1 = max(0, fx - pad_w)
-            face_y1 = max(0, fy - pad_h)
-            face_x2 = min(w, fx + fw_f + pad_w)
-            face_y2 = min(h, fy + fh_f + pad_h)
-            
-            face_crop = img[face_y1:face_y2, face_x1:face_x2]
-            feature = recognizer.extract_feature(face_crop)
+            face_box = faces[0][0:4]
+            if np.isfinite(face_box).all():
+                fx, fy, fw_f, fh_f = map(int, face_box)
+                pad_w = int(fw_f * 0.15)
+                pad_h = int(fh_f * 0.15)
+                
+                face_x1 = max(0, fx - pad_w)
+                face_y1 = max(0, fy - pad_h)
+                face_x2 = min(w, fx + fw_f + pad_w)
+                face_y2 = min(h, fy + fh_f + pad_h)
+                
+                if face_x2 > face_x1 and face_y2 > face_y1:
+                    face_crop = img[face_y1:face_y2, face_x1:face_x2]
+                    feature = recognizer.extract_feature(face_crop)
     except Exception as ex:
         logger.warning(f"Face detection in upload image failed, fallback to whole image extraction: {ex}")
 
@@ -129,6 +132,9 @@ def register_face():
         except Exception as ex2:
             logger.error(f"Failed to extract face feature vector: {ex2}")
             return _error("特征提取失败", 500)
+
+    if feature is None:
+        return _error("提取人脸特征向量失败，无法识别照片中的人脸，请上传更清晰的正面照片", 400)
 
     feature_list = feature.tolist() if hasattr(feature, "tolist") else list(feature)
     feature_json = json.dumps(feature_list)

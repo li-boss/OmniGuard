@@ -14,6 +14,7 @@ class SchedulerService:
 
     def __init__(self):
         self.scheduler = BackgroundScheduler()
+        self.app = None
         self._setup_jobs()
 
     def _setup_jobs(self):
@@ -43,12 +44,15 @@ class SchedulerService:
         )
 
     def _escalation_check_job(self):
-        try:
-            result = check_escalation()
-            if result:
-                logger.info('Escalation check: escalated alarms %s', result)
-        except Exception as e:
-            logger.error('Escalation check job failed: %s', str(e))
+        if not self.app:
+            return
+        with self.app.app_context():
+            try:
+                result = check_escalation()
+                if result:
+                    logger.info('Escalation check: escalated alarms %s', result)
+            except Exception as e:
+                logger.error('Escalation check job failed: %s', str(e))
 
     def _heartbeat_job(self):
         try:
@@ -57,14 +61,18 @@ class SchedulerService:
             logger.error('Heartbeat job failed: %s', str(e))
 
     def _daily_report_job(self):
-        try:
-            report = report_generator.generate_daily_report()
-            markdown = report_generator.format_report_markdown(report)
-            logger.info('Daily report generated:\n%s', markdown[:200])
-        except Exception as e:
-            logger.error('Daily report job failed: %s', str(e))
+        if not self.app:
+            return
+        with self.app.app_context():
+            try:
+                report = report_generator.generate_daily_report()
+                markdown = report_generator.format_report_markdown(report)
+                logger.info('Daily report generated:\n%s', markdown[:200])
+            except Exception as e:
+                logger.error('Daily report job failed: %s', str(e))
 
-    def start(self):
+    def start(self, app):
+        self.app = app
         if not self.scheduler.running:
             self.scheduler.start()
             logger.info('Scheduler started')

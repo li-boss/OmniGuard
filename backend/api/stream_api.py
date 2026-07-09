@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 import cv2
 import numpy as np
-from flask import Blueprint, Response
+from flask import Blueprint, Response, request
 
 stream_bp = Blueprint("streams", __name__)
 
@@ -88,5 +88,7 @@ def generate_demo_frames():
 
 @stream_bp.get("/demo.mjpg")
 def demo_stream():
+    if request.method == 'HEAD':
+        return Response("", mimetype="multipart/x-mixed-replace; boundary=frame")
     return Response(generate_demo_frames(),
                     mimetype="multipart/x-mixed-replace; boundary=frame")

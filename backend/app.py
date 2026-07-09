@@ -92,7 +92,7 @@ def create_app(config_class=Config):
             atexit.register(manager.stop)
             
             from services.scheduler import scheduler_svc
-            scheduler_svc.start()
+            scheduler_svc.start(app)
             atexit.register(scheduler_svc.stop)
 
     return app

@@ -8,16 +8,31 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
+        // 注意：不再写 Checkout 阶段，SCM 会自动拉取
+
+        stage('Install Dependencies') {
+            parallel {
+                stage('Frontend Dependencies') {
+                    steps {
+                        dir('frontend') {
+                            sh 'npm install'
+                        }
+                    }
+                }
+                stage('Backend Dependencies') {
+                    steps {
+                        dir('backend') {
+                            sh 'pip install -r requirements.txt'
+                            sh 'pip install flake8 pytest pytest-cov'
+                        }
+                    }
+                }
             }
         }
 
         stage('Frontend Lint') {
             steps {
                 dir('frontend') {
-                    sh 'npm install'
                     sh 'npx eslint src/'
                 }
             }
@@ -34,7 +49,6 @@ pipeline {
         stage('Backend Lint') {
             steps {
                 dir('backend') {
-                    sh 'pip install flake8'
                     sh 'python -m flake8 . --config=.flake8'
                 }
             }
@@ -51,8 +65,12 @@ pipeline {
         stage('Backend Test') {
             steps {
                 dir('backend') {
-                    sh 'pip install -r requirements.txt'
-                    sh 'python -m pytest tests/ -v --tb=short --cov=.'
+                    sh 'python -m pytest tests/ -v --tb=short --cov=. --junitxml=tests/reports/report.xml'
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'backend/tests/reports/*.xml'
                 }
             }
         }
@@ -70,7 +88,6 @@ pipeline {
 
     post {
         always {
-            junit 'backend/tests/reports/*.xml'
             archiveArtifacts artifacts: 'frontend/dist/**/*', fingerprint: true
             cleanWs()
         }

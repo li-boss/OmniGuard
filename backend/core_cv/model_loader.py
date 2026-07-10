@@ -27,6 +27,7 @@ class ModelLoader:
     _yolo = None
     _face_detector = None
     _face_recognizer = None
+    _face_detector_lock = threading.Lock()
 
     @classmethod
     def get_yolo(cls):
@@ -39,18 +40,16 @@ class ModelLoader:
     @classmethod
     def get_face_detector(cls):
         if cls._face_detector is None:
-            path = os.path.join(WEIGHTS_DIR, 'face_detection_yunet_2023mar.onnx')
-            logger.info(f"Loading YuNet Face Detector from {path}...")
-            # Default input size is 320x320, we can adjust this dynamically using setInputSize()
-            cls._face_detector = cv2.FaceDetectorYN.create(
-                model=path,
-                config="",
-                input_size=(320, 320),
-                score_threshold=0.6,
-                nms_threshold=0.3,
-                backend_id=cv2.dnn.DNN_BACKEND_DEFAULT,
-                target_id=cv2.dnn.DNN_TARGET_CPU
-            )
+            with cls._face_detector_lock:
+                if cls._face_detector is None:
+                    logger.info("Loading RetinaFace Detector (mobile0.25)...")
+                    from retinaface import RetinaFaceDetector
+                    import torch
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                    detector = RetinaFaceDetector(model='mobile0.25', device=device)
+                    # Preset fixed input shape to avoid constant anchor generation overhead
+                    detector.set_input_shape(256, 256)
+                    cls._face_detector = detector
         return cls._face_detector
 
     @classmethod
@@ -85,19 +84,15 @@ class ModelLoader:
         else:
             logger.warning(f"YOLOv8 weight file not found at {yolo_path}, skipping warmup.")
 
-        # 2. Warmup Face Detector (YuNet)
-        detector_path = os.path.join(WEIGHTS_DIR, 'face_detection_yunet_2023mar.onnx')
-        if os.path.exists(detector_path):
-            try:
-                detector = cls.get_face_detector()
-                dummy_face = np.zeros((320, 320, 3), dtype=np.uint8)
-                detector.setInputSize((320, 320))
-                detector.detect(dummy_face)
-                logger.info("YuNet Face Detector warmup completed.")
-            except Exception as e:
-                logger.error(f"YuNet Face Detector warmup failed: {e}")
-        else:
-            logger.warning(f"YuNet weight file not found at {detector_path}, skipping warmup.")
+        # 2. Warmup Face Detector (RetinaFace)
+        try:
+            detector = cls.get_face_detector()
+            dummy_face = np.zeros((256, 256, 3), dtype=np.uint8)
+            detector.set_input_shape(256, 256)
+            detector.inference(dummy_face)
+            logger.info("RetinaFace Detector warmup completed.")
+        except Exception as e:
+            logger.error(f"RetinaFace Detector warmup failed: {e}")
 
         # 3. Warmup Face Recognizer (ArcFace)
         recognizer_path = os.path.join(WEIGHTS_DIR, 'arcface_w600k_r50.onnx')

@@ -308,6 +308,7 @@ class CameraPipeline:
         self.yolo_detector = YoloDetector()
         self.tracker = SimpleTracker()
         self.zones = []
+        self.temporal_filter = {} # Map object_id -> list of names for temporal filtering
         
         self.last_clean_time = time.time()
         self.latest_processed_frame = None
@@ -338,6 +339,11 @@ class CameraPipeline:
             person_boxes = [det["box"] for det in detections]
             tracks = self.tracker.update(person_boxes)
 
+            # Prevent memory leak by removing stale tracking IDs from the temporal filter
+            for active_id in list(self.temporal_filter.keys()):
+                if active_id not in tracks:
+                    self.temporal_filter.pop(active_id, None)
+
             # Map track IDs
             for det in detections:
                 det_box = det["box"]
@@ -360,13 +366,45 @@ class CameraPipeline:
                     frame, det["box"]
                 )
 
+                # Push to temporal filter sliding window and cap history size to 15
+                if obj_id not in self.temporal_filter:
+                    self.temporal_filter[obj_id] = []
+                self.temporal_filter[obj_id].append(name)
+                if len(self.temporal_filter[obj_id]) > 15:
+                    self.temporal_filter[obj_id].pop(0)
+
+                # Consensus Decision
+                hist = self.temporal_filter[obj_id]
+                consensus_name = "Stranger"
+                if hist:
+                    # 1. Quick Pass (last 3 frames, known user matching frequency >= 2)
+                    recent_3 = hist[-3:]
+                    non_strangers_3 = [n for n in recent_3 if n != "Stranger"]
+                    if len(non_strangers_3) >= 2:
+                        counts_3 = {}
+                        for n in non_strangers_3:
+                            counts_3[n] = counts_3.get(n, 0) + 1
+                        top_name_3 = max(counts_3, key=counts_3.get)
+                        if counts_3[top_name_3] >= 2:
+                            consensus_name = top_name_3
+
+                    # 2. Slow Pass (last 5 frames, known user matching frequency >= 60%)
+                    if consensus_name == "Stranger":
+                        recent_5 = hist[-5:]
+                        counts = {}
+                        for n in recent_5:
+                            counts[n] = counts.get(n, 0) + 1
+                        best_name = max(counts, key=counts.get)
+                        if best_name != "Stranger" and (counts[best_name] / len(recent_5)) >= 0.6:
+                            consensus_name = best_name
+
                 results.append({
                     "box": det["box"],
                     "box_norm": det["box_norm"],
                     "object_id": obj_id,
                     "face_found": face_found,
                     "face_box_norm": face_box_norm,
-                    "name": name
+                    "name": consensus_name
                 })
 
                 # Evaluate zones
@@ -389,11 +427,11 @@ class CameraPipeline:
                         }
                         alarm_data = {
                             "alarm_type": "electronic_fence",
-                            "level": "medium" if name != "Stranger" else "high",
+                            "level": "medium" if consensus_name != "Stranger" else "high",
                             "camera_id": self.camera_id,
                             "coordinate": coordinate_info,
                             "snapshot_frame": frame.copy(),
-                            "name": name
+                            "name": consensus_name
                         }
                         try:
                             alarm_queue.put_nowait(alarm_data)

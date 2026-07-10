@@ -2,6 +2,8 @@ from pathlib import Path
 from flask import Flask
 from flask_cors import CORS
 
+
+
 BASE_DIR = Path(__file__).resolve().parent
 from flask_jwt_extended import JWTManager
 from services.ws_handler import socketio
@@ -94,6 +96,9 @@ def create_app(config_class=Config):
             from services.scheduler import scheduler_svc
             scheduler_svc.start(app)
             atexit.register(scheduler_svc.stop)
+            
+            from api.face_api import init_auto_recalculate
+            init_auto_recalculate(app)
 
     return app
 

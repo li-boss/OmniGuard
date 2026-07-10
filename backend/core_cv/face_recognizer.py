@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 
 # Helper functions for face alignment and similarity calculation
 REFERENCE_FACIAL_POINTS = np.array([
-    [30.2946, 51.6963],  # Left Eye
-    [65.5318, 51.5014],  # Right Eye
-    [48.0252, 71.7366],  # Nose Tip
-    [33.5493, 92.3655],  # Left Mouth Corner
-    [62.7299, 92.2041]   # Right Mouth Corner
+    [38.2946, 51.6963],   # Left Eye
+    [73.5318, 51.5014],   # Right Eye
+    [56.0252, 71.7366],   # Nose Tip
+    [41.5493, 92.3655],   # Left Mouth Corner
+    [70.7299, 92.2041]    # Right Mouth Corner
 ], dtype=np.float32)
 
 def align_face(face_img, landmarks_5point):
@@ -28,6 +28,27 @@ def align_face(face_img, landmarks_5point):
         return aligned_face
     except Exception:
         return cv2.resize(face_img, (112, 112))
+
+def is_good_face(face_img, min_blur_threshold=20.0, min_brightness=40, max_brightness=230):
+    """
+    Filter face crops that are too blurry or have poor lighting (too dark/too bright).
+    """
+    if face_img is None or face_img.size == 0:
+        return False
+    try:
+        gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        if laplacian_var < min_blur_threshold:
+            logger.debug(f"Face quality rejected: Laplacian variance {laplacian_var:.1f} < threshold {min_blur_threshold}")
+            return False
+        mean_brightness = np.mean(gray)
+        if mean_brightness < min_brightness or mean_brightness > max_brightness:
+            logger.debug(f"Face quality rejected: Mean brightness {mean_brightness:.1f} out of range")
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"Error during face quality checking: {e}")
+        return False
 
 def calc_similarity(feat1, feat2):
     """Calculate the cosine similarity between two L2-normalized feature vectors."""
@@ -138,7 +159,7 @@ class FaceRecognizer:
 
     def detect_and_recognize_in_person(self, frame, person_box):
         """
-        Detect and recognize a face within a detected person bounding box using YuNet and ArcFace.
+        Detect and recognize a face within a detected person bounding box using RetinaFace and ArcFace.
         person_box is [x1, y1, x2, y2] absolute coordinates.
         Returns: face_found (bool), face_box_norm (list or None), name (str), user_id (int or None), distance (float)
         """
@@ -160,27 +181,34 @@ class FaceRecognizer:
             return False, None, "Stranger", None, 1.0
 
         try:
+            # Resize crop to (256, 256) for RetinaFace detector to optimize anchor generation
+            person_crop_resized = cv2.resize(person_crop, (256, 256))
             detector = ModelLoader.get_face_detector()
-            detector.setInputSize((cw, ch))
             
-            retval, faces = detector.detect(person_crop)
+            resp = detector.inference(person_crop_resized)
+            faces = resp.get("bbox", [])
+            landmarks_all = resp.get("landmarks", [])
+            
             if faces is None or len(faces) == 0:
                 return False, None, "Stranger", None, 1.0
 
-            # Get the face with the highest confidence
+            # Get the face with the highest score
             best_face = faces[0]
-            if not np.isfinite(best_face[0:4]).all():
-                return False, None, "Stranger", None, 1.0
-            fx, fy, f_w, f_h = map(int, best_face[0:4])
+            fx1, fy1, fx2, fy2, score = best_face
             
-            # Extract 5 landmarks coordinates relative to person_crop
-            landmarks = np.array([
-                [best_face[4], best_face[5]],   # Left eye
-                [best_face[6], best_face[7]],   # Right eye
-                [best_face[8], best_face[9]],   # Nose tip
-                [best_face[10], best_face[11]], # Left mouth corner
-                [best_face[12], best_face[13]]  # Right mouth corner
-            ], dtype=np.float32)
+            # Scale coordinates back to original person_crop size
+            scale_x = cw / 256.0
+            scale_y = ch / 256.0
+            
+            fx = int(fx1 * scale_x)
+            fy = int(fy1 * scale_y)
+            f_w = int((fx2 - fx1) * scale_x)
+            f_h = int((fy2 - fy1) * scale_y)
+            
+            # Map landmarks back to person_crop coordinate space
+            landmarks = landmarks_all[0].copy().astype(np.float32)
+            landmarks[:, 0] *= scale_x
+            landmarks[:, 1] *= scale_y
 
             # 1. Padded crop for liveness detection
             pad_w = int(f_w * 0.15)
@@ -216,6 +244,20 @@ class FaceRecognizer:
             # 2. Align face image for feature extraction
             aligned_face = align_face(person_crop, landmarks)
             
+            # Quality check: Blur and brightness filtering
+            if not is_good_face(aligned_face, min_blur_threshold=20.0):
+                abs_face_x1 = x1 + fx
+                abs_face_y1 = y1 + fy
+                abs_face_x2 = x1 + fx + f_w
+                abs_face_y2 = y1 + fy + f_h
+                face_box_norm = [
+                    max(0.0, min(1.0, abs_face_x1 / fw)),
+                    max(0.0, min(1.0, abs_face_y1 / fh)),
+                    max(0.0, min(1.0, abs_face_x2 / fw)),
+                    max(0.0, min(1.0, abs_face_y2 / fh))
+                ]
+                return True, face_box_norm, "Stranger", None, 1.0
+
             # Extract feature (512-dimensional for ArcFace)
             feat = self.extract_feature(aligned_face)
             if feat is None:

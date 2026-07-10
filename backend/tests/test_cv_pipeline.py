@@ -9,6 +9,8 @@ import time
 # Add backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+
 from app import create_app
 from models import db, AlertZone, RegisteredFace
 from core_cv.model_loader import ModelLoader
@@ -147,6 +149,15 @@ class TestConfig:
 
 class TestFlaskIntegration(unittest.TestCase):
     def setUp(self):
+        # Reset CameraPipelineManager singleton state to prevent leak from other test files
+        from core_cv.pipeline import CameraPipelineManager
+        manager = CameraPipelineManager()
+        with manager._lock:
+            manager.pipelines.clear()
+            manager.dirty_cameras.clear()
+            CameraPipelineManager._instance = None
+            manager._initialized = False
+
         self.app = create_app(TestConfig)
         self.client = self.app.test_client()
         
@@ -162,6 +173,8 @@ class TestFlaskIntegration(unittest.TestCase):
         with manager._lock:
             manager.pipelines.clear()
             manager.dirty_cameras.clear()
+            CameraPipelineManager._instance = None
+            manager._initialized = False
 
     def test_rules_api_marks_dirty_and_status(self):
         # Verify initial cameras status is empty
@@ -283,6 +296,15 @@ class TestFaceRecognizer(unittest.TestCase):
 
 class TestCameraPipelineE2E(unittest.TestCase):
     def setUp(self):
+        # Reset CameraPipelineManager singleton state to prevent leak from other test files/classes
+        from core_cv.pipeline import CameraPipelineManager
+        manager = CameraPipelineManager()
+        with manager._lock:
+            manager.pipelines.clear()
+            manager.dirty_cameras.clear()
+            CameraPipelineManager._instance = None
+            manager._initialized = False
+
         self.app = create_app(TestConfig)
         self.app_context = self.app.app_context()
         self.app_context.push()
@@ -363,7 +385,6 @@ class TestCameraPipelineE2E(unittest.TestCase):
         with patch('time.time', return_value=t_start + 5.0):
             pipeline.process_frame()
             
-        # Verify alarm is added to the queue
         self.assertFalse(alarm_queue.empty())
         alarm_item = alarm_queue.get()
         self.assertEqual(alarm_item["camera_id"], "cam_e2e_01")

@@ -10,4 +10,6 @@ requests==2.32.3
 ultralytics>=8.2.48
 onnxruntime>=1.20.0
 APScheduler>=3.10.0
+retinaface-py==0.0.2
+
 

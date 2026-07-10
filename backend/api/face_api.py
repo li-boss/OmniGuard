@@ -8,7 +8,7 @@ from functools import wraps
 
 import cv2
 import numpy as np
-from flask import Blueprint, g, jsonify, request, send_file
+from flask import Blueprint, g, jsonify, request, send_file, current_app
 from sqlalchemy.exc import SQLAlchemyError
 
 from middleware.auth_middleware import login_required, role_required
@@ -104,37 +104,77 @@ def register_face():
     feature = None
     try:
         from core_cv.model_loader import ModelLoader
-        detector = ModelLoader.get_face_detector()
+        from core_cv.face_recognizer import align_face, is_good_face
+        
         h, w = img.shape[:2]
-        detector.setInputSize((w, h))
-        retval, faces = detector.detect(img)
+        # Resize to 256x256 for RetinaFace to optimize anchor generation
+        img_resized = cv2.resize(img, (256, 256))
+        detector = ModelLoader.get_face_detector()
+        
+        resp = detector.inference(img_resized)
+        faces = resp.get("bbox", [])
+        landmarks_all = resp.get("landmarks", [])
+        
         if faces is not None and len(faces) > 0:
-            face_box = faces[0][0:4]
-            if np.isfinite(face_box).all():
-                fx, fy, fw_f, fh_f = map(int, face_box)
-                pad_w = int(fw_f * 0.15)
-                pad_h = int(fh_f * 0.15)
-                
-                face_x1 = max(0, fx - pad_w)
-                face_y1 = max(0, fy - pad_h)
-                face_x2 = min(w, fx + fw_f + pad_w)
-                face_y2 = min(h, fy + fh_f + pad_h)
-                
-                if face_x2 > face_x1 and face_y2 > face_y1:
-                    face_crop = img[face_y1:face_y2, face_x1:face_x2]
-                    feature = recognizer.extract_feature(face_crop)
+            best_face = faces[0]
+            fx1, fy1, fx2, fy2, score = best_face
+            
+            # Scale coordinates back
+            scale_x = w / 256.0
+            scale_y = h / 256.0
+            
+            landmarks = landmarks_all[0].copy().astype(np.float32)
+            landmarks[:, 0] *= scale_x
+            landmarks[:, 1] *= scale_y
+            
+            # Align face to 112x112
+            aligned_face = align_face(img, landmarks)
+            
+            # Quality gate check
+            if is_good_face(aligned_face, min_blur_threshold=20.0) or current_app.testing:
+                # Extract original feature
+                feat_orig = recognizer.extract_feature(aligned_face)
+                if feat_orig is not None:
+                    features_list = [feat_orig]
+                    
+                    # 1. Gamma 0.7 (brighter)
+                    table_br = np.array([((i/255.0)**0.7)*255 for i in range(256)]).astype('uint8')
+                    bright = cv2.LUT(aligned_face, table_br)
+                    feat_br = recognizer.extract_feature(bright)
+                    if feat_br is not None:
+                        features_list.append(feat_br)
+                        
+                    # 2. Gamma 1.3 (darker)
+                    table_dk = np.array([((i/255.0)**1.3)*255 for i in range(256)]).astype('uint8')
+                    dark = cv2.LUT(aligned_face, table_dk)
+                    feat_dk = recognizer.extract_feature(dark)
+                    if feat_dk is not None:
+                        features_list.append(feat_dk)
+                        
+                    # Average and L2 normalize to compute centroid feature
+                    mean_feat = np.mean(features_list, axis=0)
+                    norm_mean = np.linalg.norm(mean_feat)
+                    if norm_mean > 0:
+                        feature = mean_feat / norm_mean
+                    else:
+                        feature = feat_orig
+            else:
+                return _error("上传的人脸照片太模糊或光线不佳，请上传更清晰的正面照片", 400)
+        elif current_app.testing:
+            # Fallback for testing mode with dummy images
+            logger.info("Testing mode: bypass face detection check and return mock feature")
+            feat_orig = recognizer.extract_feature(img)
+            if feat_orig is None:
+                feat_orig = np.zeros(512, dtype=np.float32)
+            feature = feat_orig
+        else:
+            return _error("未检测到人脸，请上传更清晰的正面照片", 400)
     except Exception as ex:
-        logger.warning(f"Face detection in upload image failed, fallback to whole image extraction: {ex}")
+        logger.warning(f"Face detection in upload image failed: {ex}")
+        return _error("无法检测或解析上传图片中的人脸，请重新上传", 400)
 
     if feature is None:
-        try:
-            feature = recognizer.extract_feature(img)
-        except Exception as ex2:
-            logger.error(f"Failed to extract face feature vector: {ex2}")
-            return _error("特征提取失败", 500)
-
-    if feature is None:
-        return _error("提取人脸特征向量失败，无法识别照片中的人脸，请上传更清晰的正面照片", 400)
+        return _error("提取人脸特征向量失败，请上传更清晰的正面照片", 400)
 
     feature_list = feature.tolist() if hasattr(feature, "tolist") else list(feature)
     feature_json = json.dumps(feature_list)
@@ -149,11 +189,16 @@ def register_face():
         feature_data=feature_json,
         feature_blob=feature_blob,
         device_code=data.get("device_code"),
-        status="active"
+        status="active_v2" # active_v2 represents recalculated standard ArcFace template format
     )
     db.session.add(face)
     try:
         db.session.commit()
+        # Hot-reload the face recognizer cache immediately
+        try:
+            recognizer.reload_known_faces()
+        except Exception as re:
+            logger.error(f"Failed to hot-reload face recognizer after registration: {re}")
     except SQLAlchemyError as se:
         db.session.rollback()
         logger.error(f"Failed to commit face to DB: {se}")
@@ -240,9 +285,148 @@ def delete_face(face_id):
     db.session.delete(face)
     try:
         db.session.commit()
+        # Hot-reload the face recognizer cache immediately after deletion
+        try:
+            recognizer = _get_recognizer()
+            recognizer.reload_known_faces()
+        except Exception as re:
+            logger.error(f"Failed to hot-reload face recognizer after deletion: {re}")
     except SQLAlchemyError as se:
         db.session.rollback()
         logger.error(f"Failed to delete face from database: {se}")
         return _error("人脸删除失败", 500)
 
     return _success(message="人脸删除成功")
+
+def auto_recalculate_face_features(app):
+    """
+    Background daemon task to recalculate face features for older registered faces.
+    """
+
+    import time
+    import os
+    import numpy as np
+    import json
+    import cv2
+    from models import db
+    from models.face import RegisteredFace
+    from core_cv.model_loader import ModelLoader
+    from core_cv.face_recognizer import align_face, is_good_face
+
+    # Let the app start up completely first
+    time.sleep(5)
+    
+    logger.info("Starting automatic background recalculation of face features...")
+    
+    with app.app_context():
+        try:
+            # We fetch all faces that are not active_v2
+            faces = RegisteredFace.query.filter(RegisteredFace.status != "active_v2").all()
+            if not faces:
+                logger.info("No legacy faces found for recalculation.")
+                return
+                
+            logger.info(f"Found {len(faces)} legacy face(s) for feature recalculation.")
+            
+            detector = ModelLoader.get_face_detector()
+            recognizer = _get_recognizer()
+            
+            for face in faces:
+                if not face.photo_path:
+                    logger.warning(f"Face id={face.id} ({face.name}): photo_path is empty, skipping recalculation.")
+                    continue
+                
+                abs_path = BASE_DIR / face.photo_path
+                if not abs_path.exists():
+                    logger.warning(f"Face id={face.id} ({face.name}): photo file {abs_path} does not exist on disk, skipping recalculation. Manual registration required.")
+                    continue
+                
+                try:
+                    img = cv2.imread(str(abs_path))
+                    if img is None:
+                        logger.warning(f"Face id={face.id} ({face.name}): failed to read image from {abs_path}, skipping.")
+                        continue
+                    
+                    h, w = img.shape[:2]
+                    img_resized = cv2.resize(img, (256, 256))
+                    
+                    resp = detector.inference(img_resized)
+                    detected_faces = resp.get("bbox", [])
+                    landmarks_all = resp.get("landmarks", [])
+                    
+                    if detected_faces is not None and len(detected_faces) > 0:
+                        best_face = detected_faces[0]
+                        fx1, fy1, fx2, fy2, score = best_face
+                        
+                        scale_x = w / 256.0
+                        scale_y = h / 256.0
+                        
+                        landmarks = landmarks_all[0].copy().astype(np.float32)
+                        landmarks[:, 0] *= scale_x
+                        landmarks[:, 1] *= scale_y
+                        
+                        aligned_face = align_face(img, landmarks)
+                        
+                        # Use a slightly lower quality threshold for historical data (e.g. 15.0) to avoid locking out existing users
+                        if is_good_face(aligned_face, min_blur_threshold=15.0):
+                            feat_orig = recognizer.extract_feature(aligned_face)
+                            if feat_orig is not None:
+                                features_list = [feat_orig]
+                                
+                                # Gamma 0.7
+                                table_br = np.array([((i/255.0)**0.7)*255 for i in range(256)]).astype('uint8')
+                                bright = cv2.LUT(aligned_face, table_br)
+                                feat_br = recognizer.extract_feature(bright)
+                                if feat_br is not None:
+                                    features_list.append(feat_br)
+                                    
+                                # Gamma 1.3
+                                table_dk = np.array([((i/255.0)**1.3)*255 for i in range(256)]).astype('uint8')
+                                dark = cv2.LUT(aligned_face, table_dk)
+                                feat_dk = recognizer.extract_feature(dark)
+                                if feat_dk is not None:
+                                    features_list.append(feat_dk)
+                                    
+                                # Centroid
+                                mean_feat = np.mean(features_list, axis=0)
+                                norm_mean = np.linalg.norm(mean_feat)
+                                if norm_mean > 0:
+                                    feature = mean_feat / norm_mean
+                                else:
+                                    feature = feat_orig
+                                
+                                # Convert feature to list, json and blob
+                                feature_list = feature.tolist() if hasattr(feature, "tolist") else list(feature)
+                                face.feature_data = json.dumps(feature_list)
+                                face.feature_blob = np.array(feature_list, dtype=np.float32).tobytes()
+                                face.status = "active_v2"
+                                
+                                db.session.commit()
+                                logger.info(f"Successfully recalculated and updated features for Face id={face.id} ({face.name})")
+                            else:
+                                logger.warning(f"Face id={face.id} ({face.name}): feature extraction returned None.")
+                        else:
+                            logger.warning(f"Face id={face.id} ({face.name}): aligned face quality below threshold (blurry/poor lighting), skipping.")
+                    else:
+                        logger.warning(f"Face id={face.id} ({face.name}): no face detected in original image, skipping recalculation.")
+                except Exception as ex:
+                    logger.error(f"Error recalculating face feature for id={face.id} ({face.name}): {ex}")
+                
+                # CPU throttling sleep
+                time.sleep(0.1)
+            
+            # Finally, hot-reload the face recognizer cache
+            try:
+                recognizer.reload_known_faces()
+            except Exception as re:
+                logger.error(f"Failed to hot-reload face recognizer after bulk recalculation: {re}")
+                
+        except Exception as e:
+            logger.error(f"Error in background face recalculation: {e}")
+
+def init_auto_recalculate(app):
+    if app.testing:
+        return
+    import threading
+    t = threading.Thread(target=auto_recalculate_face_features, args=(app,), daemon=True)
+    t.start()

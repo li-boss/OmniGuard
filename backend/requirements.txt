@@ -1,0 +1,15 @@
+Flask==3.1.2
+Flask-Cors==6.0.2
+Flask-SQLAlchemy==3.1.1
+Flask-SocketIO==5.5.1
+PyJWT==2.10.1
+pytest==8.4.2
+opencv-contrib-python==4.10.0.84
+python-dotenv==1.0.1
+requests==2.32.3
+ultralytics>=8.2.48
+onnxruntime>=1.20.0
+APScheduler>=3.10.0
+retinaface-py==0.0.2
+
+

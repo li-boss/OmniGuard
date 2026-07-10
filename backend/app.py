@@ -110,4 +110,7 @@ def _seed_admin(app):
 
 
 if __name__ == "__main__":
-    socketio.run(create_app(), host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
+    from waitress import serve
+    app_instance = create_app()
+    print("Starting production server on http://0.0.0.0:5000 with 100 threads...")
+    serve(app_instance, host="0.0.0.0", port=5000, threads=100)

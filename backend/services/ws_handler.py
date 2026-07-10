@@ -5,7 +5,7 @@ from flask_socketio import SocketIO
 
 logger = logging.getLogger(__name__)
 
-socketio = SocketIO(cors_allowed_origins="*")
+socketio = SocketIO(cors_allowed_origins="*", transports=["polling"])
 
 _subscribed_cameras = {}
 

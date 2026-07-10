@@ -20,6 +20,86 @@ logger = logging.getLogger(__name__)
 # Global alarm queue, thread-safe
 alarm_queue = queue.Queue(maxsize=200)
 
+class DoubleBuffer:
+    def __init__(self):
+        self.buffers = [None, None]
+        self.write_idx = 0
+        self.read_idx = 1
+        self.lock = threading.Lock()
+        self.new_frame_available = False
+
+    def write(self, frame):
+        """Write frame and swap read/write indexes."""
+        if frame is None:
+            return
+        with self.lock:
+            self.buffers[self.write_idx] = frame.copy()
+            self.write_idx, self.read_idx = self.read_idx, self.write_idx
+            self.new_frame_available = True
+
+    def read(self):
+        """Read latest frame if available."""
+        with self.lock:
+            if not self.new_frame_available:
+                return None
+            frame = self.buffers[self.read_idx]
+            self.new_frame_available = False
+            return frame
+
+
+class AIInferencePool:
+    def __init__(self, manager, num_workers=1):
+        self.manager = manager
+        self.tasks = {}  # camera_id -> frame
+        self.lock = threading.Lock()
+        self.condition = threading.Condition(self.lock)
+        self.running = False
+        self.workers = []
+        self.num_workers = num_workers
+
+    def start(self):
+        self.running = True
+        self.workers = []
+        for i in range(self.num_workers):
+            t = threading.Thread(target=self._worker_loop, name=f"AIInferenceWorker-{i}", daemon=True)
+            t.start()
+            self.workers.append(t)
+        logger.info(f"AIInferencePool started with {self.num_workers} workers.")
+
+    def stop(self):
+        self.running = False
+        with self.condition:
+            self.condition.notify_all()
+        for t in self.workers:
+            t.join(timeout=2.0)
+        logger.info("AIInferencePool stopped.")
+
+    def submit(self, camera_id, frame):
+        if frame is None:
+            return
+        with self.condition:
+            self.tasks[camera_id] = frame.copy()
+            self.condition.notify()
+
+    def _worker_loop(self):
+        while self.running:
+            with self.condition:
+                while not self.tasks and self.running:
+                    self.condition.wait()
+                if not self.running:
+                    break
+                camera_id = next(iter(self.tasks.keys()))
+                frame = self.tasks.pop(camera_id)
+
+            try:
+                pipeline = self.manager.pipelines.get(camera_id)
+                if pipeline is not None:
+                    results = pipeline.run_inference(frame)
+                    pipeline.update_detection_results(results)
+            except Exception as e:
+                logger.error(f"Error in AIInferencePool worker loop: {e}")
+
+
 def resolve_camera_url(camera_id):
     """Resolve camera_id to stream source URL or local webcam index."""
     if (camera_id.startswith("rtsp://") or 
@@ -216,14 +296,15 @@ class AlarmWorker(threading.Thread):
 
 
 class CameraPipeline:
-    def __init__(self, camera_id, url, app, face_recognizer, rule_engine):
+    def __init__(self, camera_id, url, app, face_recognizer, rule_engine, manager=None):
         self.camera_id = camera_id
         self.url = url
         self.app = app
         self.face_recognizer = face_recognizer
         self.rule_engine = rule_engine
+        self.manager = manager
         
-        self.stream_manager = StreamManager(url)
+        self.stream_manager = StreamManager(url, frame_skip=1)
         self.yolo_detector = YoloDetector()
         self.tracker = SimpleTracker()
         self.zones = []
@@ -232,47 +313,32 @@ class CameraPipeline:
         self.latest_processed_frame = None
         self.frame_lock = threading.Lock()
 
+        # Asynchronous buffers
+        self.double_buffer = DoubleBuffer()
+        self.results_lock = threading.Lock()
+        self.latest_detection_results = []
+        self.last_inference_time = 0.0
+        self.latest_jpeg_bytes = None
+
     def update_zones(self, zones):
         self.zones = zones
         logger.info(f"Updated {len(zones)} zones for camera {self.camera_id}")
 
-    def process_frame(self):
-        # Read latest frame
-        frame = self.stream_manager.get_latest_frame()
-        if frame is None:
-            return
-            
-        # Periodically clean up expired tracker / rule states (every 10 seconds)
+    def run_inference(self, frame):
+        """Heavy AI inference (YOLO, Tracker, Face Recognition, Rules) running in thread pool."""
         now = time.time()
         if now - self.last_clean_time > 10.0:
             self.rule_engine.cleanup_expired_states()
             self.last_clean_time = now
 
-        # Draw zones and other stuff on drawn_frame
-        drawn_frame = frame.copy()
-        h, w = frame.shape[:2]
-        
-        # Draw zones
-        for zone in self.zones:
-            pts = []
-            for p in zone.get("polygon", []):
-                px = int(p["x"] * w) if p["x"] <= 1.0 else int(p["x"])
-                py = int(p["y"] * h) if p["y"] <= 1.0 else int(p["y"])
-                pts.append([px, py])
-            if pts:
-                pts_arr = np.array(pts, np.int32).reshape((-1, 1, 2))
-                cv2.polylines(drawn_frame, [pts_arr], True, (0, 165, 255), 2)
-                cv2.putText(drawn_frame, zone.get("name", "Zone"), (pts[0][0], pts[0][1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
-
-        # 1. Person Detection using YOLO
         detections = self.yolo_detector.detect(frame)
+        results = []
+        
         if detections:
-            # 2. Update simple tracker to get consistent object IDs
             person_boxes = [det["box"] for det in detections]
             tracks = self.tracker.update(person_boxes)
 
-            # Map tracker outputs to original detections by box match (using IoU)
+            # Map track IDs
             for det in detections:
                 det_box = det["box"]
                 det["object_id"] = None
@@ -284,19 +350,115 @@ class CameraPipeline:
                         if score > 0.8:
                             det["object_id"] = obj_id
 
-            # 3. Process each person detection
+            # Process each detected person
             for det in detections:
                 obj_id = det["object_id"]
                 if obj_id is None:
                     continue
 
-                # Run Face detection and recognition inside the person crop
                 face_found, face_box_norm, name, user_id, dist = self.face_recognizer.detect_and_recognize_in_person(
                     frame, det["box"]
                 )
 
+                results.append({
+                    "box": det["box"],
+                    "box_norm": det["box_norm"],
+                    "object_id": obj_id,
+                    "face_found": face_found,
+                    "face_box_norm": face_box_norm,
+                    "name": name
+                })
+
+                # Evaluate zones
+                zones = list(self.zones)
+                for zone in zones:
+                    if not zone.get("enabled", True):
+                        continue
+
+                    should_trigger, duration = self.rule_engine.evaluate_stay(
+                        object_id=obj_id,
+                        box_norm=det["box_norm"],
+                        zone=zone
+                    )
+
+                    if should_trigger:
+                        logger.warning(f"Stay alert triggered for Object {obj_id} in Zone {zone['name']} (duration: {duration:.1f}s)")
+                        coordinate_info = {
+                            "person_box": det["box_norm"],
+                            "face_box": face_box_norm if face_found else None
+                        }
+                        alarm_data = {
+                            "alarm_type": "electronic_fence",
+                            "level": "medium" if name != "Stranger" else "high",
+                            "camera_id": self.camera_id,
+                            "coordinate": coordinate_info,
+                            "snapshot_frame": frame.copy(),
+                            "name": name
+                        }
+                        try:
+                            alarm_queue.put_nowait(alarm_data)
+                        except queue.Full:
+                            try:
+                                alarm_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                            alarm_queue.put_nowait(alarm_data)
+        return results
+
+    def update_detection_results(self, results):
+        with self.results_lock:
+            self.latest_detection_results = results
+            self.last_inference_time = time.time()
+
+    def process_frame(self):
+        # 1. Read latest frame from stream_manager
+        frame = self.stream_manager.get_latest_frame()
+        if frame is None:
+            return
+
+        # 2. Check if manager is active and running (Asynchronous mode) vs. Synchronous mode (for tests)
+        is_async = (self.manager is not None and getattr(self.manager, "running", False))
+        
+        if is_async:
+            self.double_buffer.write(frame)
+            self.manager.inference_pool.submit(self.camera_id, frame)
+        else:
+            # Synchronous fallback for standalone runs / tests
+            results = self.run_inference(frame)
+            self.update_detection_results(results)
+
+        # 3. Draw zones and latest detection results on the frame
+        drawn_frame = frame.copy()
+        h, w = frame.shape[:2]
+
+        # Draw alert zones
+        zones = list(self.zones)
+        for zone in zones:
+            pts = []
+            for p in zone.get("polygon", []):
+                px = int(p["x"] * w) if p["x"] <= 1.0 else int(p["x"])
+                py = int(p["y"] * h) if p["y"] <= 1.0 else int(p["y"])
+                pts.append([px, py])
+            if pts:
+                pts_arr = np.array(pts, np.int32).reshape((-1, 1, 2))
+                cv2.polylines(drawn_frame, [pts_arr], True, (0, 165, 255), 2)
+                cv2.putText(drawn_frame, zone.get("name", "Zone"), (pts[0][0], pts[0][1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+
+        # Draw overlays under lock to avoid race conditions
+        with self.results_lock:
+            results = list(self.latest_detection_results)
+            results_fresh = (time.time() - self.last_inference_time < 1.5)
+
+        if results_fresh:
+            for res in results:
+                box = res["box"]
+                obj_id = res["object_id"]
+                name = res["name"]
+                face_found = res["face_found"]
+                face_box_norm = res["face_box_norm"]
+
                 # Draw person box
-                box = det["box"]
                 cv2.rectangle(drawn_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
                 cv2.putText(drawn_frame, f"Person (ID {obj_id})", (int(box[0]), int(box[1]) - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 1)
@@ -311,47 +473,14 @@ class CameraPipeline:
                     cv2.putText(drawn_frame, name, (fx1, fy1 - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 180, 0), 1)
 
-                # 4. Evaluate Alert Zones
-                for zone in self.zones:
-                    if not zone.get("enabled", True):
-                        continue
-
-                    should_trigger, duration = self.rule_engine.evaluate_stay(
-                        object_id=obj_id,
-                        box_norm=det["box_norm"],
-                        zone=zone
-                    )
-
-                    if should_trigger:
-                        logger.warning(f"Stay alert triggered for Object {obj_id} in Zone {zone['name']} (duration: {duration:.1f}s)")
-                        
-                        coordinate_info = {
-                            "person_box": det["box_norm"],
-                            "face_box": face_box_norm if face_found else None
-                        }
-                        
-                        alarm_data = {
-                            "alarm_type": "electronic_fence",
-                            "level": "medium" if name != "Stranger" else "high",
-                            "camera_id": self.camera_id,
-                            "coordinate": coordinate_info,
-                            "snapshot_frame": frame.copy(),
-                            "name": name
-                        }
-                        
-                        # Safe put in queue
-                        try:
-                            alarm_queue.put_nowait(alarm_data)
-                        except queue.Full:
-                            try:
-                                alarm_queue.get_nowait()
-                            except queue.Empty:
-                                pass
-                            alarm_queue.put_nowait(alarm_data)
-
-        # Save to latest_processed_frame (with lock and copy to prevent thread race condition)
+        # 4. Save to latest_processed_frame in lock-protected way
         with self.frame_lock:
             self.latest_processed_frame = drawn_frame.copy()
+            ok, jpeg = cv2.imencode('.jpg', drawn_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            if ok:
+                self.latest_jpeg_bytes = jpeg.tobytes()
+            else:
+                self.latest_jpeg_bytes = None
 
     def release(self):
         self.stream_manager.release()
@@ -378,6 +507,7 @@ class CameraPipelineManager:
             
             # Map of camera_id -> CameraPipeline
             self.pipelines = {}
+            self.inference_pool = None
             
             self.dirty_cameras = set()
             self.running = False
@@ -441,7 +571,8 @@ class CameraPipelineManager:
                             url=url,
                             app=self.app,
                             face_recognizer=self.face_recognizer,
-                            rule_engine=self.rule_engine
+                            rule_engine=self.rule_engine,
+                            manager=self
                         )
                         pipeline.update_zones(serialized_zones)
                         self.pipelines[camera_id] = pipeline
@@ -479,6 +610,10 @@ class CameraPipelineManager:
             # Start database writing worker
             self._alarm_worker = AlarmWorker(self.app)
             self._alarm_worker.start()
+            
+            # Start AI Inference Pool
+            self.inference_pool = AIInferencePool(self, num_workers=1)
+            self.inference_pool.start()
             
             # Load registered faces initially
             self.face_recognizer.reload_known_faces()
@@ -528,6 +663,9 @@ class CameraPipelineManager:
         
         if self._runner_thread is not None:
             self._runner_thread.join(timeout=3.0)
+            
+        if self.inference_pool is not None:
+            self.inference_pool.stop()
             
         if self._alarm_worker is not None:
             self._alarm_worker.running = False

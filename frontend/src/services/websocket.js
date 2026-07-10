@@ -7,7 +7,7 @@ export function connectAlarmStream(token, onAlarm) {
 
   socket = io('/', {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    transports: ['polling'],
     auth: { token },
   })
 

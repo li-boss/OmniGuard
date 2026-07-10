@@ -21,5 +21,6 @@ class Config:
     DINGTALK_WEBHOOK = os.getenv("DINGTALK_WEBHOOK", "")
     REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
     ALARM_COOLDOWN_SECONDS = int(os.getenv("ALARM_COOLDOWN_SECONDS", "30"))
+    FACE_MATCH_THRESHOLD = float(os.getenv("FACE_MATCH_THRESHOLD", "0.5"))
     DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "admin")
     DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")

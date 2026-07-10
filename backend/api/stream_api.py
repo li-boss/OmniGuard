@@ -92,16 +92,30 @@ def _demo_frame():
 
 
 def generate_demo_frames():
+    from core_cv.pipeline import CameraPipelineManager
+    manager = CameraPipelineManager()
     last_good_jpeg = None
 
     while True:
-        frame = _latest_pipeline_frame()
+        # Fetch camera pipeline
+        pipeline = manager.pipelines.get('cam-1') or (list(manager.pipelines.values())[0] if manager.pipelines else None)
+        jpeg_bytes = None
         sleep_seconds = 0.04
-        if frame is None:
+
+        if pipeline is not None:
+            # Try getting pre-encoded JPEG bytes
+            jpeg_bytes = getattr(pipeline, 'latest_jpeg_bytes', None)
+            if jpeg_bytes is None and pipeline.latest_processed_frame is not None:
+                # Fallback to encoding on the fly
+                with pipeline.frame_lock:
+                    frame = pipeline.latest_processed_frame.copy()
+                jpeg_bytes = _frame_to_jpeg_bytes(frame)
+        else:
+            # Demo fallback
             frame = _demo_frame()
+            jpeg_bytes = _frame_to_jpeg_bytes(frame)
             sleep_seconds = 0.1
 
-        jpeg_bytes = _frame_to_jpeg_bytes(frame)
         if jpeg_bytes is None:
             jpeg_bytes = last_good_jpeg
         else:

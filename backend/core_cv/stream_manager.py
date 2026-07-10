@@ -52,16 +52,7 @@ class StreamManager:
         if h < 32 or w < 32:
             return True
 
-        step_y = max(1, h // 180)
-        step_x = max(1, w // 240)
-        sample = frame[::step_y, ::step_x, :3]
-        horizontal_diff = np.mean(np.abs(sample[:, 1:].astype(np.int16) - sample[:, :-1].astype(np.int16)))
-        vertical_diff = np.mean(np.abs(sample[1:, :].astype(np.int16) - sample[:-1, :].astype(np.int16)))
-        channel_std = float(np.mean(np.std(sample, axis=(0, 1))))
-
-        # Full-frame colored static has both high color variance and high
-        # neighboring-pixel differences. Normal camera frames rarely hit both.
-        return channel_std > 55.0 and max(horizontal_diff, vertical_diff) > 55.0
+        return False
 
     def _read_valid_warmup_frame(self, capture, attempts=8):
         frame = None

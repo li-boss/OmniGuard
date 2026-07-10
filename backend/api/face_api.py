@@ -25,11 +25,11 @@ def _get_recognizer():
         from core_cv.face_recognizer import FaceRecognizer
         return FaceRecognizer()
     except (ImportError, AttributeError):
-        # 降级方案：若 CV 管线未就绪，使用随机初始化的归一化 128 维特征向量
+        # 降级方案：若 CV 管线未就绪，使用随机初始化的归一化 512 维特征向量
         import random
         class DummyRecognizer:
             def extract_feature(self, img):
-                feat = np.array([random.random() for _ in range(128)], dtype=np.float32)
+                feat = np.array([random.random() for _ in range(512)], dtype=np.float32)
                 norm = np.linalg.norm(feat)
                 if norm > 0:
                     feat = feat / norm

@@ -431,8 +431,26 @@ class CameraPipeline:
         drawn_frame = frame.copy()
         h, w = frame.shape[:2]
 
-        # Draw alert zones
         zones = list(self.zones)
+
+        # Draw overlays under lock to avoid race conditions
+        with self.results_lock:
+            results = list(self.latest_detection_results)
+            results_fresh = (time.time() - self.last_inference_time < 1.5)
+
+        # Track which zones have people inside
+        zones_with_people = set()
+        if results_fresh:
+            for res in results:
+                box_norm = res.get("box_norm")
+                if box_norm:
+                    point = self.rule_engine.get_center(box_norm)
+                    for zone in zones:
+                        if zone.get("enabled", True):
+                            if self.rule_engine.point_in_polygon(point, zone["polygon"]):
+                                zones_with_people.add(zone["id"])
+
+        # Draw alert zones
         for zone in zones:
             pts = []
             for p in zone.get("polygon", []):
@@ -441,14 +459,11 @@ class CameraPipeline:
                 pts.append([px, py])
             if pts:
                 pts_arr = np.array(pts, np.int32).reshape((-1, 1, 2))
-                cv2.polylines(drawn_frame, [pts_arr], True, (0, 165, 255), 2)
+                # Red if someone is inside, orange otherwise
+                zone_color = (0, 0, 255) if zone["id"] in zones_with_people else (0, 165, 255)
+                cv2.polylines(drawn_frame, [pts_arr], True, zone_color, 2)
                 cv2.putText(drawn_frame, zone.get("name", "Zone"), (pts[0][0], pts[0][1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
-
-        # Draw overlays under lock to avoid race conditions
-        with self.results_lock:
-            results = list(self.latest_detection_results)
-            results_fresh = (time.time() - self.last_inference_time < 1.5)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, zone_color, 1)
 
         if results_fresh:
             for res in results:

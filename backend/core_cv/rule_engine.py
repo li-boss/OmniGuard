@@ -53,10 +53,32 @@ class RuleEngine:
             
         return inside
 
+    def get_center(self, box_norm):
+        """Calculate the center of a normalized box [x1, y1, x2, y2]."""
+        x1, y1, x2, y2 = box_norm
+        return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+
     def get_bottom_center(self, box_norm):
         """Calculate the bottom-center of a normalized box [x1, y1, x2, y2]."""
         x1, y1, x2, y2 = box_norm
         return ((x1 + x2) / 2.0, y2)
+
+    def box_in_polygon_ratio(self, box_norm, polygon):
+        """
+        Calculate what ratio of the box is inside the polygon.
+        Returns a value between 0.0 and 1.0.
+        """
+        x1, y1, x2, y2 = box_norm
+        # Sample 9 points in the box (3x3 grid)
+        points = []
+        for i in range(3):
+            for j in range(3):
+                px = x1 + (x2 - x1) * (i + 1) / 4.0
+                py = y1 + (y2 - y1) * (j + 1) / 4.0
+                points.append((px, py))
+        
+        inside_count = sum(1 for p in points if self.point_in_polygon(p, polygon))
+        return inside_count / len(points)
 
     def evaluate_stay(self, object_id, box_norm, zone):
         """
@@ -65,7 +87,8 @@ class RuleEngine:
         """
         zone_id = zone["id"]
         stay_seconds = zone.get("stay_seconds", 5)
-        point = self.get_bottom_center(box_norm)
+        # Use center point instead of bottom center for more sensitive detection
+        point = self.get_center(box_norm)
         
         now = time.time()
         zone_state = self.entered_at[zone_id]

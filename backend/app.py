@@ -57,9 +57,11 @@ def create_app(config_class=Config):
     from api.face_api import face_bp
     from api.log_api import log_bp
     from api.stream_api import stream_bp
+    from api.alert_api import alert_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(log_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
+    app.register_blueprint(alert_bp)
 
     # Ensure directories exist
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
@@ -68,6 +70,8 @@ def create_app(config_class=Config):
     def health():
         from datetime import datetime, timezone
         from flask import jsonify
+        import threading
+        from api.stream_api import get_active_streams
         return jsonify({
             "code": 0,
             "message": "ok",
@@ -76,6 +80,8 @@ def create_app(config_class=Config):
                 "status": "UP",
                 "time": datetime.now(timezone.utc).isoformat(),
                 "database": "UP",
+                "threads": threading.active_count(),
+                "active_streams": get_active_streams()
             },
         })
 
@@ -105,6 +111,11 @@ def create_app(config_class=Config):
             
             from api.face_api import init_auto_recalculate
             init_auto_recalculate(app)
+
+            from services.alert_handler import get_alert_handler
+            alert_handler = get_alert_handler()
+            alert_handler.start()
+            atexit.register(alert_handler.stop)
 
     return app
 

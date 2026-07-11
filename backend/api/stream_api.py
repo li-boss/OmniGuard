@@ -1,8 +1,21 @@
 import time
 from datetime import datetime
+import logging
+import threading
 import cv2
 import numpy as np
 from flask import Blueprint, Response, request, current_app
+
+logger = logging.getLogger(__name__)
+
+_active_streams = {}
+_active_streams_lock = threading.Lock()
+
+
+def get_active_streams():
+    """Return a snapshot of active MJPEG stream counts."""
+    with _active_streams_lock:
+        return dict(_active_streams)
 
 stream_bp = Blueprint("streams", __name__)
 
@@ -156,45 +169,68 @@ def generate_camera_frames(camera_id, manager):
     last_good_jpeg = None
     last_fallback_time = 0
 
-    while True:
-        pipeline = manager.pipelines.get(camera_id) if manager else None
-        jpeg_bytes = None
-        sleep_seconds = 0.04
+    with _active_streams_lock:
+        _active_streams[camera_id] = _active_streams.get(camera_id, 0) + 1
+        active_count = _active_streams[camera_id]
+    logger.info(
+        f"MJPEG Stream started for {camera_id} "
+        f"(active: {active_count}, total threads: {threading.active_count()})"
+    )
 
-        if pipeline is not None:
-            jpeg_bytes = getattr(pipeline, 'latest_jpeg_bytes', None)
-            if jpeg_bytes is None and pipeline.latest_processed_frame is not None:
-                with pipeline.frame_lock:
-                    frame = pipeline.latest_processed_frame.copy()
-                jpeg_bytes = _frame_to_jpeg_bytes(frame)
-        
-        if jpeg_bytes is None:
-            is_connecting = True
-            url_str = ""
+    try:
+        while True:
+            pipeline = manager.pipelines.get(camera_id) if manager else None
+            jpeg_bytes = None
+            sleep_seconds = 0.04
+
             if pipeline is not None:
-                url_str = str(pipeline.url)
-                if getattr(pipeline, "stream_manager", None) is not None:
-                    is_connecting = not pipeline.stream_manager.connected
-            else:
-                try:
-                    from core_cv.pipeline import load_camera_streams
-                    streams = load_camera_streams()
-                    url_str = str(streams.get(camera_id, ""))
-                except Exception:
-                    pass
-
-            now_sec = int(time.time() * 2.0)
-            if last_good_jpeg is None or now_sec != last_fallback_time:
-                fallback_frame = _generate_fallback_frame(camera_id, url_str, connecting=is_connecting)
-                last_good_jpeg = _frame_to_jpeg_bytes(fallback_frame)
-                last_fallback_time = now_sec
+                jpeg_bytes = getattr(pipeline, 'latest_jpeg_bytes', None)
+                if jpeg_bytes is None and pipeline.latest_processed_frame is not None:
+                    with pipeline.frame_lock:
+                        frame = pipeline.latest_processed_frame.copy()
+                    jpeg_bytes = _frame_to_jpeg_bytes(frame)
             
-            jpeg_bytes = last_good_jpeg
+            if jpeg_bytes is None:
+                is_connecting = True
+                url_str = ""
+                if pipeline is not None:
+                    url_str = str(pipeline.url)
+                    if getattr(pipeline, "stream_manager", None) is not None:
+                        is_connecting = not pipeline.stream_manager.connected
+                else:
+                    try:
+                        from core_cv.pipeline import load_camera_streams
+                        streams = load_camera_streams()
+                        url_str = str(streams.get(camera_id, ""))
+                    except Exception:
+                        pass
 
-        if jpeg_bytes is not None:
-            yield _mjpeg_chunk(jpeg_bytes)
+                now_sec = int(time.time() * 2.0)
+                if last_good_jpeg is None or now_sec != last_fallback_time:
+                    fallback_frame = _generate_fallback_frame(camera_id, url_str, connecting=is_connecting)
+                    last_good_jpeg = _frame_to_jpeg_bytes(fallback_frame)
+                    last_fallback_time = now_sec
+                
+                jpeg_bytes = last_good_jpeg
 
-        time.sleep(sleep_seconds)
+            if jpeg_bytes is not None:
+                yield _mjpeg_chunk(jpeg_bytes)
+
+            time.sleep(sleep_seconds)
+    except GeneratorExit:
+        logger.info(f"MJPEG Stream for {camera_id} received GeneratorExit.")
+    except Exception as e:
+        logger.error(f"MJPEG Stream for {camera_id} error: {e}")
+    finally:
+        with _active_streams_lock:
+            _active_streams[camera_id] -= 1
+            active_count = _active_streams.get(camera_id, 0)
+            if active_count <= 0:
+                _active_streams.pop(camera_id, None)
+        logger.info(
+            f"MJPEG Stream stopped for {camera_id} "
+            f"(remaining active: {active_count})"
+        )
 
 
 @stream_bp.get("/<camera_id>.mjpg")

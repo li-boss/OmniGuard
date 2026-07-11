@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Bell, Map, Radio, Users } from '@lucide/vue'
 
@@ -20,6 +20,12 @@ const summary = ref({
   videoFeedUrl: '',
   recentAlarms: [],
   trend: [],
+})
+
+const maxTrendCount = computed(() => {
+  if (!summary.value.trend || summary.value.trend.length === 0) return 10
+  const maxVal = Math.max(...summary.value.trend.map(t => t.count), 0)
+  return Math.max(maxVal, 10)
 })
 
 const metrics = [
@@ -81,7 +87,7 @@ onMounted(load)
         </div>
         <div class="trend-chart">
           <div v-for="item in summary.trend" :key="item.date" class="trend-item">
-            <div class="bar" :style="{ height: `${Math.max(item.count * 24, 8)}px` }" />
+            <div class="bar" :style="{ height: `${Math.max((item.count / maxTrendCount) * 160, 8)}px` }" />
             <span>{{ item.date.slice(5) }}</span>
           </div>
         </div>

@@ -144,6 +144,19 @@ def handle_alarm(alarm_id):
 
     db.session.commit()
 
+    # Acknowledge DingTalk alert
+    try:
+        from services.alert_handler import get_alert_handler
+        alert_handler = get_alert_handler()
+        dingtalk_alert_id = f"db_event_{alarm_id}"
+        success = alert_handler.acknowledge_alert(dingtalk_alert_id)
+        if success:
+            from flask import current_app
+            current_app.logger.info(f"DingTalk alert acknowledged: {dingtalk_alert_id}")
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Failed to acknowledge DingTalk alert: {e}")
+
     push_alarm(alarm.to_dict())
 
     return jsonify({
@@ -171,6 +184,20 @@ def update_status(event_id):
             event.handle_time = datetime.utcnow()
             event.escalation_deadline = None
     db.session.commit()
+
+    # Acknowledge DingTalk alert
+    try:
+        from services.alert_handler import get_alert_handler
+        alert_handler = get_alert_handler()
+        dingtalk_alert_id = f"db_event_{event_id}"
+        success = alert_handler.acknowledge_alert(dingtalk_alert_id)
+        if success:
+            from flask import current_app
+            current_app.logger.info(f"DingTalk alert acknowledged: {dingtalk_alert_id}")
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Failed to acknowledge DingTalk alert: {e}")
+
     push_alarm(event.to_dict())
     return jsonify({
         "code": 0,

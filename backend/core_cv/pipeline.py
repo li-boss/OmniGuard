@@ -279,26 +279,34 @@ class AlarmWorker(threading.Thread):
                 except Exception as wse:
                     logger.error(f"Failed to emit alarm via WebSocket: {wse}")
                 
-                # 4. Send DingTalk notification
-                if Config.DINGTALK_WEBHOOK:
-                    try:
-                        from services.notification_svc import send_dingtalk_alarm
-                        payload = {
-                            "msgtype": "markdown",
-                            "markdown": {
-                                "title": f"智慧校园告警: {item['alarm_type']}",
-                                "text": f"### 智慧校园安全告警\n"
-                                        f"- **告警类型**: {item['alarm_type']}\n"
-                                        f"- **告警级别**: {item['level']}\n"
-                                        f"- **摄像头**: {item['camera_id']}\n"
-                                        f"- **检测人员**: {item['name']}\n"
-                                        f"- **发生时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                            }
-                        }
-                        send_dingtalk_alarm(Config.DINGTALK_WEBHOOK, payload)
-                        logger.info("DingTalk alarm notification sent.")
-                    except Exception as dte:
-                        logger.error(f"Failed to send DingTalk notification: {dte}")
+                # 4. Send DingTalk notification via alert_handler
+                try:
+                    from services.alert_handler import get_alert_handler
+                    alert_handler = get_alert_handler()
+                    
+                    zone_id = item.get("zone_id")
+                    zone_name = item.get("zone_name", "未知区域")
+                    object_id = item.get("object_id")
+                    duration = item.get("duration", 0)
+                    
+                    if zone_id and object_id:
+                        # Use database event ID as alert ID for later acknowledgment
+                        dingtalk_alert_id = f"db_event_{event.id}"
+                        
+                        success = alert_handler.handle_zone_alert(
+                            zone_id=zone_id,
+                            zone_name=zone_name,
+                            object_id=object_id,
+                            duration=duration,
+                            camera_id=item["camera_id"],
+                            alert_id=dingtalk_alert_id
+                        )
+                        if success:
+                            logger.info(f"DingTalk alarm notification sent via alert_handler. Alert ID: {dingtalk_alert_id}")
+                        else:
+                            logger.warning("Failed to send DingTalk notification via alert_handler.")
+                except Exception as dte:
+                    logger.error(f"Failed to send DingTalk notification: {dte}")
                         
             except Exception as e:
                 db.session.rollback()
@@ -444,7 +452,11 @@ class CameraPipeline:
                             "camera_id": self.camera_id,
                             "coordinate": coordinate_info,
                             "snapshot_frame": frame.copy(),
-                            "name": consensus_name
+                            "name": consensus_name,
+                            "zone_id": zone.get("id"),
+                            "zone_name": zone.get("name"),
+                            "object_id": obj_id,
+                            "duration": duration
                         }
                         try:
                             alarm_queue.put_nowait(alarm_data)

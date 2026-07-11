@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { RefreshCcw, Video } from '@lucide/vue'
 
 const props = defineProps({
@@ -8,6 +8,8 @@ const props = defineProps({
 })
 
 const version = ref(Date.now())
+const imgRef = ref(null)
+
 const videoSrc = computed(() => {
   if (!props.src) return ''
   const separator = props.src.includes('?') ? '&' : '?'
@@ -17,6 +19,12 @@ const videoSrc = computed(() => {
 function refresh() {
   version.value = Date.now()
 }
+
+onBeforeUnmount(() => {
+  if (imgRef.value) {
+    imgRef.value.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+  }
+})
 </script>
 
 <template>
@@ -31,7 +39,7 @@ function refresh() {
       </el-tooltip>
     </div>
     <div class="video-stage">
-      <img v-if="videoSrc" :src="videoSrc" alt="实时视频" />
+      <img v-if="videoSrc" ref="imgRef" :src="videoSrc" alt="实时视频" />
       <div v-else class="video-empty">
         <Video />
       </div>

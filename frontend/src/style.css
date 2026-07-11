@@ -230,6 +230,13 @@ h2 {
   align-items: start;
 }
 
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
 .section-head {
   justify-content: space-between;
   gap: 14px;

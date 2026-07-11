@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 import cv2
 import numpy as np
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response, request, current_app
 
 stream_bp = Blueprint("streams", __name__)
 
@@ -91,35 +91,105 @@ def _demo_frame():
     return frame
 
 
-def generate_demo_frames():
-    from core_cv.pipeline import CameraPipelineManager
-    manager = CameraPipelineManager()
+def _generate_fallback_frame(camera_id, url_str, connecting=True):
+    # Create a dark slate background with premium aesthetics
+    frame = np.zeros((540, 960, 3), dtype=np.uint8)
+    for y in range(540):
+        c = int(15 + 20 * (1.0 - y / 540.0))
+        frame[y, :] = (c + 5, c, c - 2)
+
+    # Draw dual border
+    cv2.rectangle(frame, (10, 10), (950, 530), (70, 60, 50), 1)
+    cv2.rectangle(frame, (8, 8), (952, 532), (40, 35, 30), 1)
+
+    # Blinking status indicator
+    is_on = int(time.time() * 2.0) % 2 == 0
+    if connecting:
+        status_text = "CONNECTING..."
+        color = (0, 165, 255) if is_on else (0, 100, 150)
+    else:
+        status_text = "OFFLINE"
+        color = (0, 0, 255) if is_on else (0, 0, 100)
+
+    cv2.circle(frame, (50, 50), 8, color, -1)
+    cv2.putText(frame, f"CAMERA ID: {str(camera_id).upper()}", (75, 57),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 240, 240), 2)
+    cv2.putText(frame, status_text, (800, 57),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+    # Configured url
+    cv2.putText(frame, f"Configured URL: {url_str}", (50, 130),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (170, 170, 170), 1)
+
+    # Instructions
+    if url_str.startswith("rtmp://") or url_str.startswith("rtsp://"):
+        cv2.putText(frame, "Instructions for Mobile / Network Stream:", (50, 200),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+        
+        cv2.putText(frame, "1. Install Larix Broadcaster or another RTMP push app on your phone", (70, 250),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        
+        cv2.putText(frame, f"2. Configure connection URL/Server: {url_str}", (70, 300),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        
+        cv2.putText(frame, "3. Ensure your phone is connected to the internet/Wi-Fi", (70, 350),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        
+        cv2.putText(frame, "4. Start broadcasting in the app to establish the live feed", (70, 400),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+    else:
+        cv2.putText(frame, "Instructions for Local Webcam:", (50, 200),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+        cv2.putText(frame, f"Webcam index {url_str} is configured", (70, 250),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        cv2.putText(frame, "Ensure no other app (e.g. Zoom, WeChat) is currently using the camera", (70, 300),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(frame, f"FEED TIME: {time_str}", (50, 495),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+
+    return frame
+
+
+def generate_camera_frames(camera_id, manager):
     last_good_jpeg = None
+    last_fallback_time = 0
 
     while True:
-        # Fetch camera pipeline
-        pipeline = manager.pipelines.get('cam-1') or (list(manager.pipelines.values())[0] if manager.pipelines else None)
+        pipeline = manager.pipelines.get(camera_id) if manager else None
         jpeg_bytes = None
         sleep_seconds = 0.04
 
         if pipeline is not None:
-            # Try getting pre-encoded JPEG bytes
             jpeg_bytes = getattr(pipeline, 'latest_jpeg_bytes', None)
             if jpeg_bytes is None and pipeline.latest_processed_frame is not None:
-                # Fallback to encoding on the fly
                 with pipeline.frame_lock:
                     frame = pipeline.latest_processed_frame.copy()
                 jpeg_bytes = _frame_to_jpeg_bytes(frame)
-        else:
-            # Demo fallback
-            frame = _demo_frame()
-            jpeg_bytes = _frame_to_jpeg_bytes(frame)
-            sleep_seconds = 0.1
-
+        
         if jpeg_bytes is None:
+            is_connecting = True
+            url_str = ""
+            if pipeline is not None:
+                url_str = str(pipeline.url)
+                if getattr(pipeline, "stream_manager", None) is not None:
+                    is_connecting = not pipeline.stream_manager.connected
+            else:
+                try:
+                    from core_cv.pipeline import load_camera_streams
+                    streams = load_camera_streams()
+                    url_str = str(streams.get(camera_id, ""))
+                except Exception:
+                    pass
+
+            now_sec = int(time.time() * 2.0)
+            if last_good_jpeg is None or now_sec != last_fallback_time:
+                fallback_frame = _generate_fallback_frame(camera_id, url_str, connecting=is_connecting)
+                last_good_jpeg = _frame_to_jpeg_bytes(fallback_frame)
+                last_fallback_time = now_sec
+            
             jpeg_bytes = last_good_jpeg
-        else:
-            last_good_jpeg = jpeg_bytes
 
         if jpeg_bytes is not None:
             yield _mjpeg_chunk(jpeg_bytes)
@@ -127,12 +197,29 @@ def generate_demo_frames():
         time.sleep(sleep_seconds)
 
 
+@stream_bp.get("/<camera_id>.mjpg")
+def camera_stream(camera_id):
+    if request.method == 'HEAD':
+        return Response("", mimetype="multipart/x-mixed-replace; boundary=frame")
+    manager = current_app.config.get('pipeline_manager')
+    return Response(
+        generate_camera_frames(camera_id, manager),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @stream_bp.get("/demo.mjpg")
 def demo_stream():
     if request.method == 'HEAD':
         return Response("", mimetype="multipart/x-mixed-replace; boundary=frame")
+    manager = current_app.config.get('pipeline_manager')
     return Response(
-        generate_demo_frames(),
+        generate_camera_frames("cam-1", manager),
         mimetype="multipart/x-mixed-replace; boundary=frame",
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",

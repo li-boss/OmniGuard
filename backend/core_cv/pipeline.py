@@ -47,57 +47,73 @@ class DoubleBuffer:
             return frame
 
 
-class AIInferencePool:
-    def __init__(self, manager, num_workers=1):
-        self.manager = manager
-        self.tasks = {}  # camera_id -> frame
+class PipelineInferenceWorker:
+    def __init__(self, pipeline):
+        self.pipeline = pipeline
+        self.latest_frame = None
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
         self.running = False
-        self.workers = []
-        self.num_workers = num_workers
+        self.thread = None
+
+    def submit(self, frame):
+        if frame is None:
+            return
+        with self.condition:
+            self.latest_frame = frame  # Zero-copy reference assignment
+            self.condition.notify()
 
     def start(self):
         self.running = True
-        self.workers = []
-        for i in range(self.num_workers):
-            t = threading.Thread(target=self._worker_loop, name=f"AIInferenceWorker-{i}", daemon=True)
-            t.start()
-            self.workers.append(t)
-        logger.info(f"AIInferencePool started with {self.num_workers} workers.")
+        self.thread = threading.Thread(
+            target=self._run_loop,
+            name=f"InferenceWorker-{self.pipeline.camera_id}",
+            daemon=True
+        )
+        self.thread.start()
 
     def stop(self):
         self.running = False
         with self.condition:
             self.condition.notify_all()
-        for t in self.workers:
-            t.join(timeout=2.0)
-        logger.info("AIInferencePool stopped.")
+        if self.thread:
+            self.thread.join(timeout=2.0)
 
-    def submit(self, camera_id, frame):
-        if frame is None:
-            return
-        with self.condition:
-            self.tasks[camera_id] = frame.copy()
-            self.condition.notify()
-
-    def _worker_loop(self):
+    def _run_loop(self):
         while self.running:
             with self.condition:
-                while not self.tasks and self.running:
+                while self.latest_frame is None and self.running:
                     self.condition.wait()
                 if not self.running:
                     break
-                camera_id = next(iter(self.tasks.keys()))
-                frame = self.tasks.pop(camera_id)
-
+                frame = self.latest_frame
+                self.latest_frame = None
+            
             try:
-                pipeline = self.manager.pipelines.get(camera_id)
-                if pipeline is not None:
-                    results = pipeline.run_inference(frame)
-                    pipeline.update_detection_results(results)
+                results = self.pipeline.run_inference(frame)
+                self.pipeline.update_detection_results(results)
             except Exception as e:
-                logger.error(f"Error in AIInferencePool worker loop: {e}")
+                logger.error(f"Error in inference worker loop for {self.pipeline.camera_id}: {e}")
+
+
+_camera_streams_cache = None
+_cache_lock = threading.Lock()
+
+def load_camera_streams():
+    global _camera_streams_cache
+    with _cache_lock:
+        if _camera_streams_cache is None:
+            json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "camera_streams.json")
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r') as f:
+                        _camera_streams_cache = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error loading camera_streams.json: {e}")
+                    _camera_streams_cache = {}
+            else:
+                _camera_streams_cache = {}
+    return _camera_streams_cache
 
 
 def resolve_camera_url(camera_id):
@@ -113,16 +129,10 @@ def resolve_camera_url(camera_id):
     if env_url:
         return env_url
         
-    json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "camera_streams.json")
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r') as f:
-                mapping = json.load(f)
-            if camera_id in mapping:
-                val = mapping[camera_id]
-                return int(val) if str(val).isdigit() else val
-        except Exception as e:
-            logger.error(f"Error reading camera_streams.json: {e}")
+    mapping = load_camera_streams()
+    if camera_id in mapping:
+        val = mapping[camera_id]
+        return int(val) if str(val).isdigit() else val
             
     # Default fallback: try 0 for local webcam
     return 0
@@ -320,6 +330,9 @@ class CameraPipeline:
         self.latest_detection_results = []
         self.last_inference_time = 0.0
         self.latest_jpeg_bytes = None
+        
+        self.inference_worker = PipelineInferenceWorker(self)
+        self.inference_worker.start()
 
     def update_zones(self, zones):
         self.zones = zones
@@ -459,7 +472,7 @@ class CameraPipeline:
         
         if is_async:
             self.double_buffer.write(frame)
-            self.manager.inference_pool.submit(self.camera_id, frame)
+            self.inference_worker.submit(frame)
         else:
             # Synchronous fallback for standalone runs / tests
             results = self.run_inference(frame)
@@ -536,6 +549,7 @@ class CameraPipeline:
                 self.latest_jpeg_bytes = None
 
     def release(self):
+        self.inference_worker.stop()
         self.stream_manager.release()
 
 
@@ -590,14 +604,18 @@ class CameraPipelineManager:
                     # Get enabled zones for this camera
                     zones = AlertZone.query.filter_by(camera_id=camera_id, enabled=True).all()
                     
-                    # We always want 'cam-1' to run even if there are no zones,
-                    # so that the stream is always active and viewable by default!
-                    if not zones and camera_id != 'cam-1':
+                    # We always want static config cameras to run even if there are no zones,
+                    # so that their stream is always active and viewable by default!
+                    config_cameras = list(load_camera_streams().keys())
+                    if not zones and camera_id not in config_cameras:
                         # No active zones, release pipeline if exists
-                        if camera_id in self.pipelines:
-                            logger.info(f"No active zones for camera {camera_id}. Releasing pipeline.")
-                            pipeline = self.pipelines.pop(camera_id)
-                            pipeline.release()
+                        pipeline_to_release = None
+                        with self._lock:
+                            if camera_id in self.pipelines:
+                                logger.info(f"No active zones for camera {camera_id}. Releasing pipeline.")
+                                pipeline_to_release = self.pipelines.pop(camera_id)
+                        if pipeline_to_release:
+                            pipeline_to_release.release()
                         continue
 
                     # Serialize zones for rule engine
@@ -612,8 +630,13 @@ class CameraPipelineManager:
                             "enabled": zone.enabled
                         })
 
-                    if camera_id in self.pipelines:
-                        self.pipelines[camera_id].update_zones(serialized_zones)
+                    pipeline_to_update = None
+                    with self._lock:
+                        if camera_id in self.pipelines:
+                            pipeline_to_update = self.pipelines[camera_id]
+
+                    if pipeline_to_update is not None:
+                        pipeline_to_update.update_zones(serialized_zones)
                     else:
                         # Resolve URL
                         url = resolve_camera_url(camera_id)
@@ -628,7 +651,8 @@ class CameraPipelineManager:
                             manager=self
                         )
                         pipeline.update_zones(serialized_zones)
-                        self.pipelines[camera_id] = pipeline
+                        with self._lock:
+                            self.pipelines[camera_id] = pipeline
                         
                 except Exception as e:
                     logger.error(f"Error reloading pipeline for camera {camera_id}: {e}")
@@ -636,13 +660,17 @@ class CameraPipelineManager:
     def initialize_pipelines(self):
         """Find all cameras that have alert zones and load them initially."""
         try:
+            # 动态加载 JSON 配置文件中定义的摄像头
+            config_cameras = list(load_camera_streams().keys())
+
             with self.app.app_context():
                 # Get unique camera_ids from AlertZone
                 camera_ids = [r[0] for r in db.session.query(AlertZone.camera_id).distinct().all()]
                 
-                # Always ensure 'cam-1' is initialized and running
-                if 'cam-1' not in camera_ids:
-                    camera_ids.append('cam-1')
+                # 合并 JSON 中配置的摄像头
+                for cam_id in config_cameras:
+                    if cam_id not in camera_ids:
+                        camera_ids.append(cam_id)
                     
                 with self._lock:
                     self.dirty_cameras.update(camera_ids)
@@ -664,10 +692,6 @@ class CameraPipelineManager:
             self._alarm_worker = AlarmWorker(self.app)
             self._alarm_worker.start()
             
-            # Start AI Inference Pool
-            self.inference_pool = AIInferencePool(self, num_workers=1)
-            self.inference_pool.start()
-            
             # Load registered faces initially
             self.face_recognizer.reload_known_faces()
             
@@ -688,7 +712,8 @@ class CameraPipelineManager:
                 
                 # 2. Round-Robin processing across all camera pipelines
                 # Get a snapshot of current pipelines to avoid dictionary modification issues
-                current_pipelines = list(self.pipelines.values())
+                with self._lock:
+                    current_pipelines = list(self.pipelines.values())
                 
                 if not current_pipelines:
                     # No active pipelines, sleep longer
@@ -717,19 +742,19 @@ class CameraPipelineManager:
         if self._runner_thread is not None:
             self._runner_thread.join(timeout=3.0)
             
-        if self.inference_pool is not None:
-            self.inference_pool.stop()
-            
         if self._alarm_worker is not None:
             self._alarm_worker.running = False
             self._alarm_worker.join(timeout=3.0)
             
         # Release all video captures
-        for camera_id, pipeline in list(self.pipelines.items()):
+        with self._lock:
+            pipelines_to_release = list(self.pipelines.items())
+            self.pipelines.clear()
+            
+        for camera_id, pipeline in pipelines_to_release:
             try:
                 pipeline.release()
             except Exception as e:
                 logger.error(f"Error releasing pipeline for camera {camera_id}: {e}")
                 
-        self.pipelines.clear()
         logger.info("CameraPipelineManager stopped successfully.")

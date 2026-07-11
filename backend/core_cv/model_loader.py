@@ -28,13 +28,17 @@ class ModelLoader:
     _face_detector = None
     _face_recognizer = None
     _face_detector_lock = threading.Lock()
+    _yolo_lock = threading.Lock()
+    _face_recognizer_lock = threading.Lock()
 
     @classmethod
     def get_yolo(cls):
         if cls._yolo is None:
-            path = os.path.join(WEIGHTS_DIR, 'yolov8n.pt')
-            logger.info(f"Loading YOLOv8 model from {path}...")
-            cls._yolo = YOLO(path)
+            with cls._yolo_lock:
+                if cls._yolo is None:
+                    path = os.path.join(WEIGHTS_DIR, 'yolov8n.pt')
+                    logger.info(f"Loading YOLOv8 model from {path}...")
+                    cls._yolo = YOLO(path)
         return cls._yolo
 
     @classmethod
@@ -55,17 +59,19 @@ class ModelLoader:
     @classmethod
     def get_face_recognizer(cls):
         if cls._face_recognizer is None:
-            # Ensure model is downloaded first
-            try:
-                from .scripts.download_models import download_required_models
-                download_required_models()
-            except Exception as de:
-                logger.error(f"Failed to auto-download models: {de}")
-                
-            path = os.path.join(WEIGHTS_DIR, 'arcface_w600k_r50.onnx')
-            logger.info(f"Loading ArcFace Recognizer from {path}...")
-            use_gpu = 'CUDAExecutionProvider' in ort.get_available_providers()
-            cls._face_recognizer = ThreadSafeONNXSession(path, use_gpu=use_gpu)
+            with cls._face_recognizer_lock:
+                if cls._face_recognizer is None:
+                    # Ensure model is downloaded first
+                    try:
+                        from .scripts.download_models import download_required_models
+                        download_required_models()
+                    except Exception as de:
+                        logger.error(f"Failed to auto-download models: {de}")
+                        
+                    path = os.path.join(WEIGHTS_DIR, 'arcface_w600k_r50.onnx')
+                    logger.info(f"Loading ArcFace Recognizer from {path}...")
+                    use_gpu = 'CUDAExecutionProvider' in ort.get_available_providers()
+                    cls._face_recognizer = ThreadSafeONNXSession(path, use_gpu=use_gpu)
         return cls._face_recognizer
 
     @classmethod

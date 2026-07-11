@@ -1,8 +1,13 @@
 from pathlib import Path
+import logging
 from flask import Flask
 from flask_cors import CORS
 
-
+# Configure logging at application startup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 from flask_jwt_extended import JWTManager
@@ -88,6 +93,7 @@ def create_app(config_class=Config):
     
     # Initialize and start the CameraPipelineManager
     manager = CameraPipelineManager(app)
+    app.config['pipeline_manager'] = manager
     if not app.testing:
         if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             manager.start()

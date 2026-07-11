@@ -65,10 +65,14 @@ onMounted(load)
     </section>
 
     <div class="dashboard-main">
-      <VideoPlayer
-        :src="summary.videoFeedUrl || camera.selectedCamera.streamUrl"
-        :title="camera.selectedCamera.name"
-      />
+      <div class="video-grid">
+        <VideoPlayer
+          v-for="cam in camera.cameras"
+          :key="cam.id"
+          :src="cam.streamUrl"
+          :title="cam.name"
+        />
+      </div>
 
       <section class="panel">
         <div class="section-head">

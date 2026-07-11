@@ -12,7 +12,7 @@ export function connectAlarmStream(token, onAlarm) {
   })
 
   socket.on('connect', () => {
-    socket.emit('subscribe', { camera_ids: ['cam-1'] })
+    socket.emit('subscribe', { camera_ids: ['cam-1', 'cam-2'] })
   })
 
   socket.on('alarm', (payload) => {

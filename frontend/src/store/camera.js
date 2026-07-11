@@ -6,8 +6,13 @@ export const useCameraStore = defineStore('camera', {
     cameras: [
       {
         id: 'cam-1',
-        name: '校园主入口',
-        streamUrl: '/api/streams/demo.mjpg',
+        name: '电脑摄像头 (本地)',
+        streamUrl: '/api/streams/cam-1.mjpg',
+      },
+      {
+        id: 'cam-2',
+        name: '手机摄像头 (RTMP)',
+        streamUrl: '/api/streams/cam-2.mjpg',
       },
     ],
   }),

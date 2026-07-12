@@ -11,5 +11,6 @@ dist/
 coverage/
 *.log
 backend/app/core_cv/weights/*.onnx
+!backend/app/core_cv/weights/minifasnet_v2se.onnx
 .DS_Store
 Thumbs.db

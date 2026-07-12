@@ -1,3 +1,5 @@
+param([switch]$Restart)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -14,26 +16,26 @@ function Test-PortListening {
     return $null -ne $connection
 }
 
-function Find-FreePort {
-    param([int]$StartPort)
-    $port = $StartPort
-    while (Test-PortListening $port) {
-        $port += 1
+function Stop-PortProcess {
+    param([int]$Port)
+    $processIds = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+    foreach ($processId in $processIds) {
+        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
     }
-    return $port
 }
 
-$backendPort = Find-FreePort 5000
-$frontendPort = Find-FreePort 5173
+$backendPort = 5000
+$frontendPort = 5173
 $frontendOrigin = "http://127.0.0.1:$frontendPort"
 $apiTarget = "http://127.0.0.1:$backendPort"
+$env:FENGONG_FRONTEND_URL = $frontendOrigin
+$env:FENGONG_BACKEND_URL = $apiTarget
 
-if ($backendPort -ne 5000) {
-    Write-Output "Port 5000 is busy. Using backend port $backendPort."
-}
-
-if ($frontendPort -ne 5173) {
-    Write-Output "Port 5173 is busy. Using frontend port $frontendPort."
+if ($Restart) {
+    Stop-PortProcess $backendPort
+    Stop-PortProcess $frontendPort
+    Start-Sleep -Milliseconds 800
 }
 
 if (-not (Test-PortListening $backendPort)) {

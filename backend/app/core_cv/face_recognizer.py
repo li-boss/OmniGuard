@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import math
+import os
 from pathlib import Path
 import threading
 from urllib.request import urlretrieve
@@ -21,8 +22,9 @@ YUNET_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection
 SFACE_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
 YUNET_DETECTION_THRESHOLD = 0.62
 YUNET_REGISTRATION_THRESHOLD = 0.45
-SFACE_COSINE_THRESHOLD = 0.363
+SFACE_COSINE_THRESHOLD = float(os.getenv("FACE_COSINE_THRESHOLD", "0.363"))
 SFACE_DISTANCE_THRESHOLD = 1.0 - SFACE_COSINE_THRESHOLD
+SFACE_COSINE_MARGIN = float(os.getenv("FACE_COSINE_MARGIN", "0.10"))
 SFACE_FEATURE_DIM = 128
 REGISTRATION_FEATURE_VARIANTS = 4
 
@@ -144,18 +146,28 @@ class FaceRecognizer:
         if not feature:
             return None, None
 
-        best = None
-        best_distance = None
+        candidates = []
         for face in known_faces:
+            face_distance = None
             for other in self._candidate_features(face):
                 if len(other) != len(feature):
                     continue
                 distance = self._cosine_distance(feature, other)
-                if best_distance is None or distance < best_distance:
-                    best = face
-                    best_distance = distance
+                if face_distance is None or distance < face_distance:
+                    face_distance = distance
+            if face_distance is not None:
+                candidates.append((face_distance, face))
 
-        if best is not None and best_distance is not None and best_distance <= threshold:
+        candidates.sort(key=lambda item: item[0])
+        if not candidates:
+            return None, None
+
+        best_distance, best = candidates[0]
+        best_similarity = 1.0 - best_distance
+        runner_up_similarity = 1.0 - candidates[1][0] if len(candidates) > 1 else None
+        has_margin = runner_up_similarity is None or best_similarity - runner_up_similarity >= SFACE_COSINE_MARGIN
+
+        if best_distance <= threshold and has_margin:
             return best, best_distance
         return None, best_distance
 
@@ -331,7 +343,7 @@ class FaceRecognizer:
     def _append_unique_feature(self, features, feature):
         if not self._is_feature_vector(feature):
             return False
-        if any(self._cosine_distance(feature, other) < 0.005 for other in features):
+        if any(self._cosine_distance(feature, other) < 0.0001 for other in features):
             return False
         features.append(feature)
         return True

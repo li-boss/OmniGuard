@@ -2,7 +2,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -12,6 +12,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app import create_app
+from app.api import stream_api
 from app.core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
 from app.core_cv.fall_detector import FallDetector
 from app.core_cv.liveness_detector import LivenessDetector
@@ -124,6 +125,30 @@ class CVPipelineTest(unittest.TestCase):
         self.assertEqual(result["alarms"][0]["eventType"], "fall")
         self.assertEqual(result["alarms"][0]["severity"], "high")
 
+    def test_live_stream_draws_and_reports_fire_detection(self):
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        fire = {
+            "box": [40, 50, 180, 190],
+            "className": "fire",
+            "eventType": "fire",
+            "confidence": 0.91,
+            "severity": "critical",
+        }
+        detector = Mock()
+        detector.detect_frame.return_value = [fire]
+
+        with self.app.app_context(), \
+                patch.object(stream_api, "_get_fire_detector", return_value=detector), \
+                patch.object(stream_api, "_known_faces", return_value=[]), \
+                patch.object(stream_api._face_recognizer, "recognize_frame", return_value=[]), \
+                patch.object(stream_api._fall_detector, "detect_frame", return_value=[]), \
+                patch.object(stream_api, "_maybe_create_fire_alarm") as create_alarm:
+            annotated = stream_api._annotate_frame(frame, "cam-1")
+
+        detector.detect_frame.assert_called_once()
+        create_alarm.assert_called_once_with(fire, "cam-1")
+        self.assertGreater(int(annotated.sum()), 0)
+
     def test_face_and_liveness_helpers(self):
         recognizer = FaceRecognizer()
         feature = recognizer.extract_feature("data:image/jpeg;base64,ZmFrZQ==")
@@ -135,7 +160,43 @@ class CVPipelineTest(unittest.TestCase):
 
         detector = LivenessDetector()
         self.assertEqual(detector.is_live(None), (False, 0.0))
-        self.assertEqual(detector.is_live({"isLive": True}), (True, 1.0))
+        self.assertTrue(detector.detect({"isLive": True}))
+
+    def test_passive_liveness_rejects_static_image(self):
+        detector = LivenessDetector(window_size=12, min_frames=6, static_threshold=0.85)
+        frame = np.full((160, 160, 3), 127, dtype=np.uint8)
+        result = None
+        for _ in range(6):
+            result = detector.analyze(frame, [20, 20, 120, 120], "static", model_score=0.9)
+        self.assertEqual(result["status"], "spoof")
+        self.assertEqual(result["reason"], "static_image")
+
+    def test_passive_liveness_accepts_natural_temporal_variation(self):
+        detector = LivenessDetector(window_size=12, min_frames=6, static_threshold=0.4)
+        rng = np.random.default_rng(7)
+        result = None
+        for index in range(6):
+            frame = rng.integers(0, 256, (160, 160, 3), dtype=np.uint8)
+            frame = np.roll(frame, index * 2, axis=1)
+            result = detector.analyze(frame, [20, 20, 120, 120], "live", model_score=0.9)
+        self.assertEqual(result["status"], "live")
+        self.assertGreater(result["score"], 0.49)
+
+    def test_pretrained_model_score_rejects_spoof(self):
+        detector = LivenessDetector(window_size=8, min_frames=5, static_threshold=0.2)
+        rng = np.random.default_rng(11)
+        result = None
+        for _ in range(5):
+            frame = rng.integers(0, 256, (160, 160, 3), dtype=np.uint8)
+            result = detector.analyze(
+                frame,
+                [20, 20, 120, 120],
+                "model-spoof",
+                model_score=0.1,
+            )
+        self.assertEqual(result["status"], "spoof")
+        self.assertEqual(result["reason"], "model_spoof")
+        self.assertLess(result["signals"]["modelLiveScore"], detector.model_threshold)
 
     def test_register_face_rejects_image_without_detectable_face(self):
         result = self.client.post("/api/faces/register", headers=self.headers, json={
@@ -180,6 +241,18 @@ class CVPipelineTest(unittest.TestCase):
 
         self.assertEqual(matched["name"], "Multi Sample")
         self.assertEqual(distance, 0.0)
+
+    def test_face_match_rejects_ambiguous_candidates(self):
+        recognizer = FaceRecognizer(threshold=0.9)
+        probe = [1.0, 0.0] + [0.0] * (SFACE_FEATURE_DIM - 2)
+        close_a = [0.99, 0.10] + [0.0] * (SFACE_FEATURE_DIM - 2)
+        close_b = [0.99, -0.10] + [0.0] * (SFACE_FEATURE_DIM - 2)
+        matched, distance = recognizer.match(probe, [
+            {"id": 1, "name": "A", "feature": close_a},
+            {"id": 2, "name": "B", "feature": close_b},
+        ])
+        self.assertIsNone(matched)
+        self.assertIsNotNone(distance)
 
 
 if __name__ == "__main__":

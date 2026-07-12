@@ -6,8 +6,10 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
-from ..core_cv.face_recognizer import FaceRecognizer, SFACE_FEATURE_DIM
+from ..core_cv.face_recognizer import FaceRecognizer, REGISTRATION_FEATURE_VARIANTS, SFACE_FEATURE_DIM
 from ..core_cv.fall_detector import FallDetector
+from ..core_cv.liveness_detector import LivenessDetector
+from ..core_cv.yolo_detector import YOLODetector
 from ..extensions import db
 from ..models import FaceRecord
 
@@ -15,8 +17,11 @@ from ..models import FaceRecord
 stream_bp = Blueprint("streams", __name__)
 _face_recognizer = FaceRecognizer()
 _fall_detector = FallDetector(confirm_frames=int(os.getenv("FALL_CONFIRM_FRAMES", "2")))
+_liveness_detector = LivenessDetector()
+_fire_detector = None
 _face_cache = {"loaded_at": 0.0, "items": []}
 _fall_alarm_state = {"last_alarm_at": 0.0}
+_fire_alarm_state = {}
 
 
 try:
@@ -176,10 +181,14 @@ def _known_faces():
     records = FaceRecord.query.order_by(FaceRecord.id.asc()).all()
     for record in records:
         features = record.get_features()
-        if (not features or any(len(feature) != SFACE_FEATURE_DIM for feature in features)) and record.image_preview:
-            features = _face_recognizer.extract_features(record.image_preview, allow_fallback=False)
-            if features:
-                record.set_features(features)
+        if (
+            (len(features) < REGISTRATION_FEATURE_VARIANTS or any(len(feature) != SFACE_FEATURE_DIM for feature in features))
+            and record.image_preview
+        ):
+            extracted = _face_recognizer.extract_features(record.image_preview, allow_fallback=False)
+            if extracted:
+                record.add_features(extracted)
+                features = record.get_features()
                 changed = True
         if features:
             items.append({
@@ -217,15 +226,69 @@ def _maybe_create_fall_alarm(fall, source):
     _fall_alarm_state["last_alarm_at"] = now
 
 
+def _get_fire_detector():
+    global _fire_detector
+    if _fire_detector is None:
+        _fire_detector = YOLODetector()
+    return _fire_detector
+
+
+def _maybe_create_fire_alarm(detection, source):
+    event_type = detection.get("eventType") or detection.get("className") or "fire"
+    cooldown = max(5, int(os.getenv("FIRE_ALARM_COOLDOWN_SECONDS", "30")))
+    state_key = (str(source), event_type)
+    now = time.time()
+    if now - _fire_alarm_state.get(state_key, 0.0) < cooldown:
+        return
+
+    from .event_api import create_alarm
+
+    display_name = "Fire" if event_type == "fire" else "Smoke"
+    create_alarm({
+        "cameraId": str(source),
+        "eventType": event_type,
+        "title": f"{display_name} detected",
+        "description": f"Real-time camera detected {display_name.lower()}",
+        "severity": detection.get("severity", "critical" if event_type == "fire" else "high"),
+        "confidence": detection.get("confidence"),
+        "detectionData": detection,
+    })
+    _fire_alarm_state[state_key] = now
+
+
 def _annotate_frame(frame, source):
+    fire_detections = []
+    if os.getenv("FIRE_DETECTION_ENABLED", "true").lower() not in {"0", "false", "no", "off"}:
+        try:
+            # Detect on the clean camera frame before any face/fall overlays are drawn.
+            fire_detections = _get_fire_detector().detect_frame(frame)
+        except Exception as exc:
+            current_app.logger.warning("Fire and smoke detection failed: %s", exc)
+
     known_faces = _known_faces()
     detections = _face_recognizer.recognize_frame(frame, known_faces=known_faces)
-    for detection in detections:
+    for index, detection in enumerate(detections):
         x, y, width, height = detection["box"]
         matched = detection["matched"]
-        color = (67, 214, 139) if matched else (64, 167, 255)
-        label = detection["name"]
-        if detection["distance"] is not None:
+        live = _liveness_detector.analyze(
+            frame,
+            face_box=detection["box"],
+            stream_id=f"{source}:{index}",
+        )
+        detection["liveness"] = live
+        if live["status"] == "spoof":
+            color = (42, 60, 229)
+            label = f"疑似图片/视频 {live['score']:.0%}"
+        elif live["status"] == "unknown":
+            color = (64, 167, 255)
+            label = "活体检测中"
+        elif matched:
+            color = (67, 214, 139)
+            label = detection["name"]
+        else:
+            color = (64, 167, 255)
+            label = detection["name"]
+        if live["status"] == "live" and detection["distance"] is not None:
             label = f"{label} {detection['confidence']:.0%}"
         _draw_box_label(frame, [x, y, x + width, y + height], label, color, font_size=24)
 
@@ -235,9 +298,25 @@ def _annotate_frame(frame, source):
         _draw_box_label(frame, fall["box"], label, (42, 60, 229), font_size=26)
         _maybe_create_fall_alarm(fall, source)
 
-    status = f"{_face_recognizer.model_name}  known={len(known_faces)}  detected={len(detections)}  falls={len(falls)}"
-    cv2.rectangle(frame, (16, 16), (610, 54), (17, 24, 32), -1)
-    cv2.putText(frame, status, (28, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (104, 209, 157), 2, cv2.LINE_AA)
+    for detection in fire_detections:
+        event_type = detection.get("eventType") or detection.get("className") or "fire"
+        confidence = float(detection.get("confidence") or 0.0)
+        label_name = "FIRE" if event_type == "fire" else "SMOKE"
+        color = (36, 64, 235) if event_type == "fire" else (80, 190, 245)
+        _draw_box_label(
+            frame,
+            detection["box"],
+            f"{label_name} {confidence:.0%}",
+            color,
+            font_size=26,
+        )
+        _maybe_create_fire_alarm(detection, source)
+
+    fire_count = sum(item.get("eventType") == "fire" for item in fire_detections)
+    smoke_count = sum(item.get("eventType") == "smoke" for item in fire_detections)
+    status = f"faces={len(detections)} fall={len(falls)} fire={fire_count} smoke={smoke_count}"
+    cv2.rectangle(frame, (16, 16), (min(frame.shape[1] - 16, 470), 54), (17, 24, 32), -1)
+    cv2.putText(frame, status, (28, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.66, (104, 209, 157), 2, cv2.LINE_AA)
     return frame
 
 

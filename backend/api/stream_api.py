@@ -56,7 +56,7 @@ def _demo_frame():
 
     cv2.rectangle(frame, (20, 20), (940, 520), (60, 50, 40), 2)
     cv2.putText(frame, "CAM-01: CAMPUS MAIN ENTRANCE (DEMO)", (40, 60),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (240, 240, 240), 2)
+               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (240, 240, 240), 2)
 
     is_even = int(time.time() * 2) % 2 == 0
     circle_color = (0, 0, 255) if is_even else (0, 0, 100)
@@ -110,6 +110,12 @@ def generate_demo_frames():
                 with pipeline.frame_lock:
                     frame = pipeline.latest_processed_frame.copy()
                 jpeg_bytes = _frame_to_jpeg_bytes(frame)
+            if jpeg_bytes is None:
+                # Keep the multipart response alive while the camera reconnects.
+                # Previously this branch yielded zero bytes forever, leaving the
+                # browser on a permanent loading/black screen.
+                jpeg_bytes = _frame_to_jpeg_bytes(_demo_frame())
+                sleep_seconds = 0.1
         else:
             # Demo fallback
             frame = _demo_frame()

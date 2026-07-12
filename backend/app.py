@@ -76,6 +76,8 @@ def create_app(config_class=Config):
 
     with app.app_context():
         db.create_all()
+        from services.schema_migrations import ensure_alarm_video_path_column
+        ensure_alarm_video_path_column()
         _seed_admin(app)
 
     # Warmup models on cold startup
@@ -91,6 +93,9 @@ def create_app(config_class=Config):
     if not app.testing:
         if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             manager.start()
+            from services.alarm_video_recorder import get_alarm_video_recorder
+            alarm_video_recorder = get_alarm_video_recorder(app)
+            atexit.register(alarm_video_recorder.stop)
             atexit.register(manager.stop)
             
             from services.scheduler import scheduler_svc

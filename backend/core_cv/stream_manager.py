@@ -23,10 +23,10 @@ class StreamManager:
         return str(self.url).isdigit()
 
     def _local_backends(self):
-        # CAP_ANY matches backend/test_camera.py and is usually the most stable
-        # option for Windows webcams. MSMF/DSHOW remain fallback options.
-        candidates = [cv2.CAP_ANY]
-        for backend_name in ("CAP_MSMF", "CAP_DSHOW"):
+        # Prefer the backend that can open the integrated camera reliably on
+        # Windows. CAP_ANY remains the final fallback.
+        candidates = []
+        for backend_name in ("CAP_DSHOW", "CAP_MSMF", "CAP_ANY"):
             backend = getattr(cv2, backend_name, None)
             if backend is not None and backend not in candidates:
                 candidates.append(backend)

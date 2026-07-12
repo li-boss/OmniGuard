@@ -16,6 +16,10 @@ export function getAlarmClip(id) {
   return request.get(`/alarms/${id}/clip`)
 }
 
+export function getAlarmVideo(id) {
+  return request.get(`/alarms/${id}/video`, { responseType: 'blob' })
+}
+
 export function deleteAlarm(id) {
   return request.delete(`/alarms/${id}`)
 }

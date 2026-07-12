@@ -13,6 +13,7 @@ class AlarmEvent(db.Model):
     zone_id = db.Column(db.Integer, nullable=True)
     snapshot_url = db.Column(db.String(500), nullable=True)
     clip_url = db.Column(db.String(500), nullable=True)
+    video_path = db.Column(db.String(500), nullable=True)
     description = db.Column(db.Text, nullable=True)
     detection_data = db.Column(db.JSON, nullable=True)
     coordinate = db.Column(db.JSON, nullable=True)
@@ -23,6 +24,7 @@ class AlarmEvent(db.Model):
     escalation_level = db.Column(db.Integer, nullable=False, default=0)
     escalation_deadline = db.Column(db.DateTime, nullable=True)
     dingtalk_notified = db.Column(db.Boolean, nullable=False, default=False)
+    triggered_at = db.Column(db.DateTime, nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -83,6 +85,7 @@ class AlarmEvent(db.Model):
             'zone_id': self.zone_id,
             'snapshot_url': self.snapshot_url,
             'clip_url': self.clip_url,
+            'video_path': self.video_path,
             'description': self.description,
             'detection_data': self.detection_data,
             'status': self.status,
@@ -92,6 +95,7 @@ class AlarmEvent(db.Model):
             'escalation_level': self.escalation_level,
             'escalation_deadline': self.escalation_deadline.isoformat() if self.escalation_deadline else None,
             'dingtalk_notified': self.dingtalk_notified,
+            'triggered_at': self.triggered_at.isoformat() if self.triggered_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

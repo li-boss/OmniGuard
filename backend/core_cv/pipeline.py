@@ -10,6 +10,7 @@ from datetime import datetime
 
 from models import db, AlertZone, AlarmEvent
 from config import Config
+from services.alarm_video_recorder import get_alarm_video_recorder
 from .stream_manager import StreamManager
 from .yolo_detector import YoloDetector
 from .face_recognizer import FaceRecognizer
@@ -204,6 +205,7 @@ class AlarmWorker(threading.Thread):
         super().__init__(name="AlarmWorkerThread", daemon=True)
         self.app = app
         self.running = True
+        self.video_recorder = get_alarm_video_recorder(app)
 
     def run(self):
         logger.info("AlarmWorker thread started.")
@@ -244,11 +246,18 @@ class AlarmWorker(threading.Thread):
                     coordinate=item["coordinate"],
                     status="pending",
                     snapshot_path=rel_path,
+                    triggered_at=item.get("triggered_at"),
                     created_at=datetime.utcnow()
                 )
                 db.session.add(event)
                 db.session.commit()
                 logger.info(f"AlarmEvent saved to DB: ID {event.id}")
+                self.video_recorder.start_recording(
+                    event.id,
+                    event.camera_id,
+                    triggered_monotonic=item.get("triggered_monotonic"),
+                    trigger_frame=item.get("snapshot_frame"),
+                )
                 
                 # 3. Emit via SocketIO
                 try:
@@ -320,6 +329,7 @@ class CameraPipeline:
         self.latest_detection_results = []
         self.last_inference_time = 0.0
         self.latest_jpeg_bytes = None
+        self.video_recorder = get_alarm_video_recorder(app)
 
     def update_zones(self, zones):
         self.zones = zones
@@ -420,6 +430,8 @@ class CameraPipeline:
                     )
 
                     if should_trigger:
+                        triggered_at = datetime.utcnow()
+                        triggered_monotonic = time.monotonic()
                         logger.warning(f"Stay alert triggered for Object {obj_id} in Zone {zone['name']} (duration: {duration:.1f}s)")
                         coordinate_info = {
                             "person_box": det["box_norm"],
@@ -431,6 +443,8 @@ class CameraPipeline:
                             "camera_id": self.camera_id,
                             "coordinate": coordinate_info,
                             "snapshot_frame": frame.copy(),
+                            "triggered_at": triggered_at,
+                            "triggered_monotonic": triggered_monotonic,
                             "name": consensus_name
                         }
                         try:
@@ -453,6 +467,7 @@ class CameraPipeline:
         frame = self.stream_manager.get_latest_frame()
         if frame is None:
             return
+        self.video_recorder.submit_frame(self.camera_id, frame)
 
         # 2. Check if manager is active and running (Asynchronous mode) vs. Synchronous mode (for tests)
         is_async = (self.manager is not None and getattr(self.manager, "running", False))

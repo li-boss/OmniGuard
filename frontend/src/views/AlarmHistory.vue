@@ -1,11 +1,15 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import { useAlarmsStore } from '../store/alarms'
+import { getAlarmVideo } from '../api/alarm'
 
 const alarms = useAlarmsStore()
 const loading = ref(false)
+const videoDialogVisible = ref(false)
+const videoLoading = ref(false)
+const videoUrl = ref('')
 const filters = reactive({
   page: 1,
   pageSize: 10,
@@ -42,7 +46,34 @@ function formatTime(value) {
   return value ? new Date(value).toLocaleString() : '-'
 }
 
+function releaseVideoUrl() {
+  if (videoUrl.value) {
+    URL.revokeObjectURL(videoUrl.value)
+    videoUrl.value = ''
+  }
+}
+
+async function showReplay(row) {
+  videoLoading.value = true
+  releaseVideoUrl()
+  try {
+    const videoBlob = await getAlarmVideo(row.id)
+    videoUrl.value = URL.createObjectURL(videoBlob)
+    videoDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '告警录像暂不可用')
+  } finally {
+    videoLoading.value = false
+  }
+}
+
+function closeReplay() {
+  videoDialogVisible.value = false
+  releaseVideoUrl()
+}
+
 onMounted(load)
+onBeforeUnmount(releaseVideoUrl)
 </script>
 
 <template>
@@ -70,8 +101,16 @@ onMounted(load)
       <el-table-column label="时间" min-width="180">
         <template #default="{ row }">{{ formatTime(row.occurredAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="270" fixed="right">
         <template #default="{ row }">
+          <el-button
+            :disabled="!row.video_url"
+            :loading="videoLoading"
+            size="small"
+            @click="showReplay(row)"
+          >
+            查看回放
+          </el-button>
           <el-button
             :disabled="row.status === 'handled'"
             size="small"
@@ -91,5 +130,24 @@ onMounted(load)
         </template>
       </el-table-column>
     </el-table>
+
+    <el-dialog
+      v-model="videoDialogVisible"
+      title="告警监控回放"
+      width="720px"
+      destroy-on-close
+      @closed="closeReplay"
+    >
+      <video
+        v-if="videoUrl"
+        :src="videoUrl"
+        controls
+        autoplay
+        preload="metadata"
+        style="display: block; width: 100%; max-height: 60vh; background: #000"
+      >
+        当前浏览器不支持 HTML5 视频播放。
+      </video>
+    </el-dialog>
   </section>
 </template>

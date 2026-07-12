@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from pathlib import Path
+
+from flask import Blueprint, request, jsonify, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models import AlarmEvent, db
@@ -197,6 +199,26 @@ def get_alarm_clip(alarm_id):
     })
 
 
+@event_bp.route('/<int:alarm_id>/video', methods=['GET'])
+@jwt_required()
+def get_alarm_video(alarm_id):
+    alarm = db.session.get(AlarmEvent, alarm_id)
+    if not alarm:
+        return jsonify({"code": 404, "message": "Alarm not found"}), 404
+
+    video_path = alarm.video_path
+    if not video_path:
+        return jsonify({"code": 404, "message": "Alarm video is not available"}), 404
+
+    filename = Path(video_path).name
+    video_dir = Path(event_bp.root_path).parent / "static" / "videos"
+    file_path = video_dir / filename
+    if not file_path.is_file():
+        return jsonify({"code": 404, "message": "Alarm video file not found"}), 404
+
+    return send_from_directory(video_dir, filename, mimetype="video/mp4", conditional=True)
+
+
 def create_alarm_from_detection(detection_data):
     severity = detection_data.get('severity', 'medium')
     escalation_deadline = None
@@ -229,6 +251,35 @@ def create_alarm_from_detection(detection_data):
 @jwt_required()
 def delete_alarm(alarm_id):
     alarm = AlarmEvent.query.get_or_404(alarm_id)
+
+    from flask import current_app
+    from services.alarm_video_recorder import stop_alarm_video_recording
+
+    stop_alarm_video_recording(current_app._get_current_object(), alarm_id)
+
+    video_dir = Path(event_bp.root_path).parent / "static" / "videos"
+    video_paths = {
+        stored_path
+        for stored_path in (alarm.video_path, alarm.clip_url)
+        if stored_path
+    }
+    video_filenames = {Path(stored_path).name for stored_path in video_paths}
+    video_filenames.update({
+        f"alarm_{alarm_id}.mp4",
+        f"alarm_{alarm_id}_browser.mp4",
+    })
+    for filename in video_filenames:
+        file_path = video_dir / filename
+        try:
+            file_path.unlink(missing_ok=True)
+        except OSError as exc:
+            current_app.logger.warning(
+                "Failed to delete alarm video file %s for alarm %s: %s",
+                file_path,
+                alarm_id,
+                exc,
+            )
+
     db.session.delete(alarm)
     db.session.commit()
     return jsonify({
@@ -244,6 +295,7 @@ def serialize_event(event):
         "false_positive": "ignored"
     }
     frontend_status = status_map.get(event.status, event.status)
+    video_url = f"/api/alarms/{event.id}/video" if event.video_path else None
     
     return {
         "id": event.id,
@@ -270,12 +322,17 @@ def serialize_event(event):
         "created_at": event.created_at.isoformat() + 'Z' if event.created_at else None,
         "handledAt": event.handle_time.isoformat() + 'Z' if event.handle_time else None,
         "handle_time": event.handle_time.isoformat() + 'Z' if event.handle_time else None,
+        "triggeredAt": event.triggered_at.isoformat() + 'Z' if event.triggered_at else None,
+        "triggered_at": event.triggered_at.isoformat() + 'Z' if event.triggered_at else None,
         
         "title": f"围栏入侵 - 摄像头 {event.camera_id}",
         "description": event.description or f"目标触发 {event.type} 规则",
         
         "clip_url": event.clip_url,
         "clipUrl": event.clip_url,
+        "video_path": event.video_path,
+        "video_url": video_url,
+        "videoUrl": video_url,
         "handler_id": event.handler_id,
         "handle_note": event.handle_note,
         "escalation_level": event.escalation_level,

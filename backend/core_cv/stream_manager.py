@@ -1,8 +1,12 @@
+import os
 import cv2
 import time
 import logging
 import threading
 import numpy as np
+
+# Disable FFmpeg buffering globally in OpenCV for lowest latency RTMP/RTSP streams
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer"
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +101,12 @@ class StreamManager:
         return None
 
     def start(self):
+        if self._is_local_camera():
+            # No background thread needed for local cameras!
+            # Frames are read directly from rtmp_pusher_svc
+            self.running = True
+            return
+
         with self._lock:
             if self.running:
                 return
@@ -169,12 +179,10 @@ class StreamManager:
         new_capture = None
         try:
             if self._is_local_camera():
-                camera_idx = int(self.url)
-                new_capture = self._open_local_capture(camera_idx)
-
-                if new_capture is None and camera_idx == 0:
-                    logger.info("Camera 0 failed to open cleanly. Trying Camera 1 as fallback...")
-                    new_capture = self._open_local_capture(1)
+                self.connected = True
+                self.consecutive_failures = 0
+                logger.info(f"Local camera mode active via RtmpPusher shared frames.")
+                return True
             else:
                 new_capture = cv2.VideoCapture(self.url)
                 if new_capture.isOpened():
@@ -211,6 +219,10 @@ class StreamManager:
                 return False
 
     def get_latest_frame(self, base_timeout_ms=1000):
+        if self._is_local_camera():
+            from services.rtmp_pusher import rtmp_pusher_svc
+            return rtmp_pusher_svc.get_latest_frame()
+
         # Automatically start the background thread if it is not running
         if not self.running:
             self.start()
@@ -232,13 +244,10 @@ class StreamManager:
             return frame
 
     def _read_local_frame(self, skip_frame):
-        with self._lock:
-            cap = self.capture
-        if cap is None:
-            return None
         try:
-            ok, frame = cap.read()
-            if ok and frame is not None and not self._looks_corrupt_frame(frame):
+            from services.rtmp_pusher import rtmp_pusher_svc
+            frame = rtmp_pusher_svc.get_latest_frame()
+            if frame is not None:
                 with self._lock:
                     self.consecutive_failures = 0
                     self.connected = True
@@ -246,20 +255,11 @@ class StreamManager:
                     return None
                 return np.ascontiguousarray(frame[:, :, :3])
 
-            with self._lock:
-                self.consecutive_failures += 1
-                if ok and frame is not None:
-                    logger.warning(f"Discarded corrupt-looking frame from local camera {self.url}")
-                    self._local_backend_index += 1
-                if self.consecutive_failures > 3:
-                    self.connected = False
-                    logger.error(f"Stream {self.url} disconnected due to consecutive invalid frames")
+            # If no frame is available yet from the pusher service, do a short wait
+            time.sleep(0.01)
             return None
         except Exception as e:
-            logger.error(f"Error reading frame from local camera {self.url}: {e}")
-            with self._lock:
-                self.consecutive_failures += 1
-                self.connected = False
+            logger.error(f"Error reading shared frame from RtmpPusher: {e}")
             return None
 
     def _read_network_frame(self, skip_frame, base_timeout_ms):

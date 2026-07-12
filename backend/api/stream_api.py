@@ -263,3 +263,36 @@ def demo_stream():
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@stream_bp.get("/config")
+def get_stream_config():
+    from core_cv.pipeline import load_camera_streams
+    streams = load_camera_streams()
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": streams
+    }
+
+
+@stream_bp.post("/cam-1/toggle_source")
+def toggle_cam1_source():
+    from core_cv.pipeline import load_camera_streams, update_camera_source
+    streams = load_camera_streams()
+    current_source = str(streams.get("cam-1", ""))
+    
+    if current_source.startswith("rtmp://"):
+        new_source = "0"
+    else:
+        new_source = "rtmp://39.97.236.134:9090/live/cam01"
+        
+    update_camera_source("cam-1", new_source)
+    return {
+        "code": 0,
+        "message": "Source updated successfully",
+        "data": {
+            "camera_id": "cam-1",
+            "source": new_source
+        }
+    }

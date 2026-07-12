@@ -370,12 +370,14 @@ class CameraPipeline:
                 det_box = det["box"]
                 det["object_id"] = None
                 best_iou = 0.0
+                best_obj_id = None
                 for obj_id, track in tracks.items():
                     score = iou(track["box"], det_box)
                     if score > best_iou:
                         best_iou = score
-                        if score > 0.8:
-                            det["object_id"] = obj_id
+                        best_obj_id = obj_id
+                if best_iou >= 0.3:
+                    det["object_id"] = best_obj_id
 
             # Process each detected person
             for det in detections:
@@ -648,7 +650,26 @@ class CameraPipelineManager:
                             pipeline_to_update = self.pipelines[camera_id]
 
                     if pipeline_to_update is not None:
-                        pipeline_to_update.update_zones(serialized_zones)
+                        url = resolve_camera_url(camera_id)
+                        if pipeline_to_update.url != url:
+                            logger.info(f"Camera {camera_id} source changed from {pipeline_to_update.url} to {url}. Recreating pipeline.")
+                            with self._lock:
+                                self.pipelines.pop(camera_id)
+                            pipeline_to_update.release()
+                            
+                            pipeline = CameraPipeline(
+                                camera_id=camera_id,
+                                url=url,
+                                app=self.app,
+                                face_recognizer=self.face_recognizer,
+                                rule_engine=self.rule_engine,
+                                manager=self
+                            )
+                            pipeline.update_zones(serialized_zones)
+                            with self._lock:
+                                self.pipelines[camera_id] = pipeline
+                        else:
+                            pipeline_to_update.update_zones(serialized_zones)
                     else:
                         # Resolve URL
                         url = resolve_camera_url(camera_id)
@@ -770,3 +791,39 @@ class CameraPipelineManager:
                 logger.error(f"Error releasing pipeline for camera {camera_id}: {e}")
                 
         logger.info("CameraPipelineManager stopped successfully.")
+
+
+def update_camera_source(camera_id, source):
+    global _camera_streams_cache
+    json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "camera_streams.json")
+    
+    # Load mapping
+    mapping = {}
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r') as f:
+                mapping = json.load(f)
+        except Exception:
+            mapping = {}
+            
+    mapping[camera_id] = source
+    
+    try:
+        with open(json_path, 'w') as f:
+            json.dump(mapping, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to write camera_streams.json: {e}")
+        
+    with _cache_lock:
+        _camera_streams_cache = mapping
+        
+    # Start RTMP pusher if not running
+    if camera_id == "cam-1":
+        from services.rtmp_pusher import rtmp_pusher_svc
+        if not rtmp_pusher_svc.running:
+            logger.info("Starting RTMP pusher background service.")
+            rtmp_pusher_svc.start()
+
+    # Trigger reload in pipeline manager
+    manager = CameraPipelineManager()
+    manager.mark_dirty(camera_id)

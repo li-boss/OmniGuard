@@ -107,26 +107,72 @@ def register_face():
         from core_cv.face_recognizer import align_face, is_good_face
         
         h, w = img.shape[:2]
-        # Resize to 256x256 for RetinaFace to optimize anchor generation
-        img_resized = cv2.resize(img, (256, 256))
-        detector = ModelLoader.get_face_detector()
         
-        resp = detector.inference(img_resized)
-        faces = resp.get("bbox", [])
-        landmarks_all = resp.get("landmarks", [])
+        # Helper function for 256x256 square-padded RetinaFace detection
+        def detect_face_in_crop(crop_img):
+            ch, cw = crop_img.shape[:2]
+            if ch == 0 or cw == 0:
+                return None
+            square_size = max(ch, cw)
+            pad_x = 0
+            pad_y = 0
+            if ch > cw:
+                pad_x = (ch - cw) // 2
+                img_square = cv2.copyMakeBorder(crop_img, 0, 0, pad_x, ch - cw - pad_x, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+            else:
+                pad_y = (cw - ch) // 2
+                img_square = cv2.copyMakeBorder(crop_img, pad_y, cw - ch - pad_y, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+            img_resized = cv2.resize(img_square, (256, 256))
+            detector = ModelLoader.get_face_detector()
+            resp = detector.inference(img_resized)
+            faces = resp.get("bbox", [])
+            landmarks_all = resp.get("landmarks", [])
+            
+            if faces is not None and len(faces) > 0:
+                best_face = faces[0]
+                fx1, fy1, fx2, fy2, score = best_face
+                scale_x = square_size / 256.0
+                scale_y = square_size / 256.0
+                
+                landmarks = landmarks_all[0].copy().astype(np.float32)
+                landmarks[:, 0] = landmarks[:, 0] * scale_x - pad_x
+                landmarks[:, 1] = landmarks[:, 1] * scale_y - pad_y
+                return landmarks
+            return None
+
+        # 1. Direct RetinaFace Detection
+        landmarks = detect_face_in_crop(img)
         
-        if faces is not None and len(faces) > 0:
-            best_face = faces[0]
-            fx1, fy1, fx2, fy2, score = best_face
-            
-            # Scale coordinates back
-            scale_x = w / 256.0
-            scale_y = h / 256.0
-            
-            landmarks = landmarks_all[0].copy().astype(np.float32)
-            landmarks[:, 0] *= scale_x
-            landmarks[:, 1] *= scale_y
-            
+        # 2. YOLO-Assisted Fallback Detection
+        if landmarks is None:
+            logger.info("Direct RetinaFace failed, falling back to YOLO person detection...")
+            yolo = ModelLoader.get_yolo()
+            results = yolo.predict(img, classes=[0], conf=0.3, imgsz=640, verbose=False)
+            if results and len(results[0].boxes) > 0:
+                best_box = None
+                max_area = 0
+                for box in results[0].boxes:
+                    coords = box.xyxy[0].tolist()
+                    area = (coords[2] - coords[0]) * (coords[3] - coords[1])
+                    if area > max_area:
+                        max_area = area
+                        best_box = coords
+                
+                if best_box is not None:
+                    px1, py1, px2, py2 = map(int, best_box)
+                    px1, py1 = max(0, px1), max(0, py1)
+                    px2, py2 = min(w, px2), min(h, py2)
+                    
+                    person_crop = img[py1:py2, px1:px2]
+                    crop_landmarks = detect_face_in_crop(person_crop)
+                    if crop_landmarks is not None:
+                        landmarks = crop_landmarks.copy()
+                        landmarks[:, 0] += px1
+                        landmarks[:, 1] += py1
+                        logger.info("Successfully detected face via YOLO-assisted fallback.")
+        
+        if landmarks is not None:
             # Align face to 112x112
             aligned_face = align_face(img, landmarks)
             
@@ -331,6 +377,37 @@ def auto_recalculate_face_features(app):
             detector = ModelLoader.get_face_detector()
             recognizer = _get_recognizer()
             
+            def detect_face_in_crop(crop_img):
+                ch, cw = crop_img.shape[:2]
+                if ch == 0 or cw == 0:
+                    return None
+                square_size = max(ch, cw)
+                pad_x = 0
+                pad_y = 0
+                if ch > cw:
+                    pad_x = (ch - cw) // 2
+                    img_square = cv2.copyMakeBorder(crop_img, 0, 0, pad_x, ch - cw - pad_x, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                else:
+                    pad_y = (cw - ch) // 2
+                    img_square = cv2.copyMakeBorder(crop_img, pad_y, cw - ch - pad_y, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+                img_resized = cv2.resize(img_square, (256, 256))
+                resp = detector.inference(img_resized)
+                faces = resp.get("bbox", [])
+                landmarks_all = resp.get("landmarks", [])
+                
+                if faces is not None and len(faces) > 0:
+                    best_face = faces[0]
+                    fx1, fy1, fx2, fy2, score = best_face
+                    scale_x = square_size / 256.0
+                    scale_y = square_size / 256.0
+                    
+                    landmarks = landmarks_all[0].copy().astype(np.float32)
+                    landmarks[:, 0] = landmarks[:, 0] * scale_x - pad_x
+                    landmarks[:, 1] = landmarks[:, 1] * scale_y - pad_y
+                    return landmarks
+                return None
+            
             for face in faces:
                 if not face.photo_path:
                     logger.warning(f"Face id={face.id} ({face.name}): photo_path is empty, skipping recalculation.")
@@ -348,23 +425,39 @@ def auto_recalculate_face_features(app):
                         continue
                     
                     h, w = img.shape[:2]
-                    img_resized = cv2.resize(img, (256, 256))
                     
-                    resp = detector.inference(img_resized)
-                    detected_faces = resp.get("bbox", [])
-                    landmarks_all = resp.get("landmarks", [])
+                    # 1. Direct RetinaFace Detection
+                    landmarks = detect_face_in_crop(img)
                     
-                    if detected_faces is not None and len(detected_faces) > 0:
-                        best_face = detected_faces[0]
-                        fx1, fy1, fx2, fy2, score = best_face
-                        
-                        scale_x = w / 256.0
-                        scale_y = h / 256.0
-                        
-                        landmarks = landmarks_all[0].copy().astype(np.float32)
-                        landmarks[:, 0] *= scale_x
-                        landmarks[:, 1] *= scale_y
-                        
+                    # 2. YOLO-Assisted Fallback Detection
+                    if landmarks is None:
+                        logger.info(f"Direct RetinaFace failed for face id={face.id} ({face.name}), falling back to YOLO person detection...")
+                        yolo = ModelLoader.get_yolo()
+                        results = yolo.predict(img, classes=[0], conf=0.3, imgsz=640, verbose=False)
+                        if results and len(results[0].boxes) > 0:
+                            best_box = None
+                            max_area = 0
+                            for box in results[0].boxes:
+                                coords = box.xyxy[0].tolist()
+                                area = (coords[2] - coords[0]) * (coords[3] - coords[1])
+                                if area > max_area:
+                                    max_area = area
+                                    best_box = coords
+                            
+                            if best_box is not None:
+                                px1, py1, px2, py2 = map(int, best_box)
+                                px1, py1 = max(0, px1), max(0, py1)
+                                px2, py2 = min(w, px2), min(h, py2)
+                                
+                                person_crop = img[py1:py2, px1:px2]
+                                crop_landmarks = detect_face_in_crop(person_crop)
+                                if crop_landmarks is not None:
+                                    landmarks = crop_landmarks.copy()
+                                    landmarks[:, 0] += px1
+                                    landmarks[:, 1] += py1
+                                    logger.info(f"Successfully detected face via YOLO fallback for face id={face.id} ({face.name}).")
+                    
+                    if landmarks is not None:
                         aligned_face = align_face(img, landmarks)
                         
                         # Use a slightly lower quality threshold for historical data (e.g. 15.0) to avoid locking out existing users

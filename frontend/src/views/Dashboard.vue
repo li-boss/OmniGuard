@@ -40,6 +40,7 @@ async function load() {
   try {
     const result = await getSummary()
     summary.value = result.data
+    await camera.fetchConfig()
   } finally {
     loading.value = false
   }
@@ -75,6 +76,7 @@ onMounted(load)
         <VideoPlayer
           v-for="cam in camera.cameras"
           :key="cam.id"
+          :id="cam.id"
           :src="cam.streamUrl"
           :title="cam.name"
         />

@@ -4,7 +4,9 @@ import { ElMessage } from 'element-plus'
 
 import CanvasDraw from '../components/CanvasDraw.vue'
 import * as zoneApi from '../api/zone'
+import { useCameraStore } from '../store/camera'
 
+const cameraStore = useCameraStore()
 const loading = ref(false)
 const zones = ref([])
 const form = reactive({
@@ -13,6 +15,11 @@ const form = reactive({
   ruleType: 'intrusion',
   points: [],
 })
+
+function getCameraName(cameraId) {
+  const cam = cameraStore.cameras.find((c) => c.id === cameraId)
+  return cam ? cam.name : cameraId
+}
 
 async function load() {
   loading.value = true
@@ -53,7 +60,14 @@ onMounted(load)
       </div>
       <el-form class="compact-form" label-position="top">
         <el-form-item label="摄像头">
-          <el-input v-model="form.cameraId" @change="load" />
+          <el-select v-model="form.cameraId" @change="load" style="width: 100%">
+            <el-option
+              v-for="cam in cameraStore.cameras"
+              :key="cam.id"
+              :label="cam.name"
+              :value="cam.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="名称">
           <el-input v-model="form.name" />
@@ -70,7 +84,7 @@ onMounted(load)
         <article v-for="zone in zones" :key="zone.id" class="list-row">
           <div>
             <strong>{{ zone.name }}</strong>
-            <span>{{ zone.cameraId }} / {{ zone.points.length }} 点</span>
+            <span>{{ getCameraName(zone.cameraId) }} / {{ zone.points.length }} 点</span>
           </div>
           <el-button size="small" @click="remove(zone)">删除</el-button>
         </article>

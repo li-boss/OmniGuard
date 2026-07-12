@@ -181,8 +181,19 @@ class FaceRecognizer:
             return False, None, "Stranger", None, 1.0
 
         try:
-            # Resize crop to (256, 256) for RetinaFace detector to optimize anchor generation
-            person_crop_resized = cv2.resize(person_crop, (256, 256))
+            # Pad crop to square to preserve aspect ratio for RetinaFace detector
+            square_size = max(ch, cw)
+            pad_x = 0
+            pad_y = 0
+            if ch > cw:
+                pad_x = (ch - cw) // 2
+                person_crop_square = cv2.copyMakeBorder(person_crop, 0, 0, pad_x, ch - cw - pad_x, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+            else:
+                pad_y = (cw - ch) // 2
+                person_crop_square = cv2.copyMakeBorder(person_crop, pad_y, cw - ch - pad_y, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+            # Resize square crop to (256, 256)
+            person_crop_resized = cv2.resize(person_crop_square, (256, 256))
             detector = ModelLoader.get_face_detector()
             
             resp = detector.inference(person_crop_resized)
@@ -196,19 +207,20 @@ class FaceRecognizer:
             best_face = faces[0]
             fx1, fy1, fx2, fy2, score = best_face
             
-            # Scale coordinates back to original person_crop size
-            scale_x = cw / 256.0
-            scale_y = ch / 256.0
+            # Scale coordinates back to square crop size
+            scale_x = square_size / 256.0
+            scale_y = square_size / 256.0
             
-            fx = int(fx1 * scale_x)
-            fy = int(fy1 * scale_y)
+            # Map back to original person_crop coordinates by subtracting the pads
+            fx = int(fx1 * scale_x - pad_x)
+            fy = int(fy1 * scale_y - pad_y)
             f_w = int((fx2 - fx1) * scale_x)
             f_h = int((fy2 - fy1) * scale_y)
             
             # Map landmarks back to person_crop coordinate space
             landmarks = landmarks_all[0].copy().astype(np.float32)
-            landmarks[:, 0] *= scale_x
-            landmarks[:, 1] *= scale_y
+            landmarks[:, 0] = landmarks[:, 0] * scale_x - pad_x
+            landmarks[:, 1] = landmarks[:, 1] * scale_y - pad_y
 
             # 1. Padded crop for liveness detection
             pad_w = int(f_w * 0.15)
@@ -245,7 +257,7 @@ class FaceRecognizer:
             aligned_face = align_face(person_crop, landmarks)
             
             # Quality check: Blur and brightness filtering
-            if not is_good_face(aligned_face, min_blur_threshold=20.0):
+            if not is_good_face(aligned_face, min_blur_threshold=5.0):
                 abs_face_x1 = x1 + fx
                 abs_face_y1 = y1 + fy
                 abs_face_x2 = x1 + fx + f_w

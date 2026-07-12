@@ -3,16 +3,27 @@ import logging
 import numpy as np
 import cv2
 import threading
+import torch
 import onnxruntime as ort
 from ultralytics import YOLO
+
+# Optimize PyTorch CPU inference threads to prevent CPU thrashing
+torch.set_num_threads(1)
 
 class ThreadSafeONNXSession:
     def __init__(self, model_path, use_gpu=False):
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
+        
+        # Configure session options to limit thread pools on CPU and avoid overhead
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = 1
+        opts.inter_op_num_threads = 1
+        opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        
         try:
-            self.session = ort.InferenceSession(model_path, providers=providers)
+            self.session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
         except Exception:
-            self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            self.session = ort.InferenceSession(model_path, sess_options=opts, providers=['CPUExecutionProvider'])
         self.lock = threading.Lock()
 
     def run(self, output_names, input_feed, run_options=None):
@@ -48,7 +59,6 @@ class ModelLoader:
                 if cls._face_detector is None:
                     logger.info("Loading RetinaFace Detector (mobile0.25)...")
                     from retinaface import RetinaFaceDetector
-                    import torch
                     device = 'cuda' if torch.cuda.is_available() else 'cpu'
                     detector = RetinaFaceDetector(model='mobile0.25', device=device)
                     # Preset fixed input shape to avoid constant anchor generation overhead
@@ -90,7 +100,6 @@ class ModelLoader:
         else:
             logger.warning(f"YOLOv8 weight file not found at {yolo_path}, skipping warmup.")
 
-        # 2. Warmup Face Detector (RetinaFace)
         try:
             detector = cls.get_face_detector()
             dummy_face = np.zeros((256, 256, 3), dtype=np.uint8)

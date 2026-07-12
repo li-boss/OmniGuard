@@ -102,6 +102,11 @@ def create_app(config_class=Config):
     app.config['pipeline_manager'] = manager
     if not app.testing:
         if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+            # Start RTMP Pusher for local camera
+            from services.rtmp_pusher import rtmp_pusher_svc
+            rtmp_pusher_svc.start()
+            atexit.register(rtmp_pusher_svc.stop)
+
             manager.start()
             atexit.register(manager.stop)
             

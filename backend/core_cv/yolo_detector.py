@@ -19,7 +19,7 @@ class YoloDetector:
 
         try:
             # Predict using YOLOv8
-            results = self.model.predict(frame, conf=self.confidence, verbose=False)
+            results = self.model.predict(frame, conf=self.confidence, imgsz=320, verbose=False)
             if not results:
                 return []
                 

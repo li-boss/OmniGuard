@@ -127,6 +127,43 @@ class AlertEventHandler:
         except Exception as e:
             logger.error(f"处理人脸告警失败: {e}")
             return False
+            
+    def handle_spoof_alert(
+        self,
+        object_id: int,
+        camera_id: str = "cam-1",
+        alert_id: Optional[str] = None
+    ) -> bool:
+        """
+        处理人脸防欺骗告警（活体检测失败）
+        """
+        try:
+            if not alert_id:
+                alert_id = f"spoof_{object_id}_{int(datetime.now().timestamp())}"
+            
+            # 欺骗攻击是高危事件，级别为 high
+            alert_level = "high"
+            
+            alert_message = f"🚨 检测到人脸欺骗攻击！人员(ID:{object_id})疑似使用照片或视频屏幕进行人脸识别欺骗。"
+            
+            extra_info = {
+                "对象ID": object_id,
+                "摄像头": camera_id,
+                "检测结果": "欺骗攻击 (Spoof Attack)",
+                "安全建议": "请立即核实该人员身份，防止非法入侵。"
+            }
+            
+            # 发送钉钉告警，类型为"陌生人告警"（自动分发给王靖杭）
+            return self.alert_service.send_alert(
+                alert_id=alert_id,
+                alert_level=alert_level,
+                alert_type="陌生人告警",
+                alert_message=alert_message,
+                extra_info=extra_info
+            )
+        except Exception as e:
+            logger.error(f"处理欺骗告警失败: {e}")
+            return False
     
     def acknowledge_alert(self, alert_id: str) -> bool:
         """

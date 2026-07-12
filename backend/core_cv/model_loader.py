@@ -38,9 +38,11 @@ class ModelLoader:
     _yolo = None
     _face_detector = None
     _face_recognizer = None
+    _liveness_net = None
     _face_detector_lock = threading.Lock()
     _yolo_lock = threading.Lock()
     _face_recognizer_lock = threading.Lock()
+    _liveness_net_lock = threading.Lock()
 
     @classmethod
     def get_yolo(cls):
@@ -83,6 +85,24 @@ class ModelLoader:
                     use_gpu = 'CUDAExecutionProvider' in ort.get_available_providers()
                     cls._face_recognizer = ThreadSafeONNXSession(path, use_gpu=use_gpu)
         return cls._face_recognizer
+
+    @classmethod
+    def get_liveness_net(cls):
+        if cls._liveness_net is None:
+            with cls._liveness_net_lock:
+                if cls._liveness_net is None:
+                    # Ensure model is downloaded first
+                    try:
+                        from .scripts.download_models import download_required_models
+                        download_required_models()
+                    except Exception as de:
+                        logger.error(f"Failed to auto-download models: {de}")
+                        
+                    path = os.path.join(WEIGHTS_DIR, '2.7_80x80_MiniFASNetV2.onnx')
+                    logger.info(f"Loading Liveness Model from {path}...")
+                    use_gpu = 'CUDAExecutionProvider' in ort.get_available_providers()
+                    cls._liveness_net = ThreadSafeONNXSession(path, use_gpu=use_gpu)
+        return cls._liveness_net
 
     @classmethod
     def warmup(cls):
@@ -130,6 +150,28 @@ class ModelLoader:
                 logger.error(f"ArcFace Recognizer warmup failed: {e}")
         else:
             logger.warning(f"ArcFace weight file not found at {recognizer_path}, skipping warmup.")
+
+        # 4. Warmup Liveness Model
+        liveness_path = os.path.join(WEIGHTS_DIR, '2.7_80x80_MiniFASNetV2.onnx')
+        if not os.path.exists(liveness_path):
+            try:
+                from .scripts.download_models import download_required_models
+                download_required_models()
+            except Exception as de:
+                logger.error(f"Failed to auto-download models: {de}")
+
+        if os.path.exists(liveness_path):
+            try:
+                net = cls.get_liveness_net()
+                dummy_input = np.zeros((1, 3, 80, 80), dtype=np.float32)
+                input_name = net.session.get_inputs()[0].name
+                output_name = net.session.get_outputs()[0].name
+                net.run([output_name], {input_name: dummy_input})
+                logger.info("Liveness Model warmup completed.")
+            except Exception as e:
+                logger.error(f"Liveness Model warmup failed: {e}")
+        else:
+            logger.warning(f"Liveness weight file not found at {liveness_path}, skipping warmup.")
             
         logger.info("All model warmups completed.")
 
@@ -139,3 +181,4 @@ class ModelLoader:
         cls._yolo = None
         cls._face_detector = None
         cls._face_recognizer = None
+        cls._liveness_net = None

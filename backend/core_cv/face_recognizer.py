@@ -75,6 +75,7 @@ class FaceRecognizer:
         self.known_faces = {}
         self._last_reload_time = 0.0
         self._refresh_interval = 30.0  # 30 seconds reload interval
+        self.liveness_detector = None
 
     def reload_known_faces(self):
         """Reload all registered faces from the SQLite database."""
@@ -157,7 +158,7 @@ class FaceRecognizer:
             logger.error(f"Error extracting face feature: {e}")
             return None
 
-    def detect_and_recognize_in_person(self, frame, person_box):
+    def detect_and_recognize_in_person(self, frame, person_box, track_id=None):
         """
         Detect and recognize a face within a detected person bounding box using RetinaFace and ArcFace.
         person_box is [x1, y1, x2, y2] absolute coordinates.
@@ -222,36 +223,33 @@ class FaceRecognizer:
             landmarks[:, 0] = landmarks[:, 0] * scale_x - pad_x
             landmarks[:, 1] = landmarks[:, 1] * scale_y - pad_y
 
-            # 1. Padded crop for liveness detection
-            pad_w = int(f_w * 0.15)
-            pad_h = int(f_h * 0.15)
-            face_x1 = max(0, fx - pad_w)
-            face_y1 = max(0, fy - pad_h)
-            face_x2 = min(cw, fx + f_w + pad_w)
-            face_y2 = min(ch, fy + f_h + pad_h)
-            liveness_crop = person_crop[face_y1:face_y2, face_x1:face_x2]
+            # Calculate absolute face coordinates in frame coordinate space
+            abs_face_x1 = x1 + fx
+            abs_face_y1 = y1 + fy
+            abs_face_x2 = x1 + fx + f_w
+            abs_face_y2 = y1 + fy + f_h
             
-            # Run liveness detection check
-            if liveness_crop.size > 0:
-                try:
-                    from .liveness_detector import LivenessDetector
-                    liveness_det = LivenessDetector()
-                    is_live, live_conf = liveness_det.is_live(liveness_crop)
-                    if not is_live:
-                        logger.debug(f"Liveness spoof attack detected (confidence: {live_conf:.2f}). Treating as Stranger.")
-                        abs_face_x1 = x1 + fx
-                        abs_face_y1 = y1 + fy
-                        abs_face_x2 = x1 + fx + f_w
-                        abs_face_y2 = y1 + fy + f_h
-                        face_box_norm = [
-                            max(0.0, min(1.0, abs_face_x1 / fw)),
-                            max(0.0, min(1.0, abs_face_y1 / fh)),
-                            max(0.0, min(1.0, abs_face_x2 / fw)),
-                            max(0.0, min(1.0, abs_face_y2 / fh))
-                        ]
-                        return True, face_box_norm, "Stranger", None, 1.0
-                except Exception as le:
-                    logger.error(f"Error in liveness detection: {le}")
+            face_box_norm = [
+                max(0.0, min(1.0, abs_face_x1 / fw)),
+                max(0.0, min(1.0, abs_face_y1 / fh)),
+                max(0.0, min(1.0, abs_face_x2 / fw)),
+                max(0.0, min(1.0, abs_face_y2 / fh))
+            ]
+
+            # Lazy-load the liveness detector
+            if self.liveness_detector is None:
+                from .liveness_detector import LivenessDetector
+                self.liveness_detector = LivenessDetector()
+
+            # Run stateful hybrid liveness check
+            liveness_status = self.liveness_detector.check(track_id, frame, [abs_face_x1, abs_face_y1, f_w, f_h])
+            
+            if liveness_status == 'Unknown':
+                logger.debug(f"Liveness status 'Unknown' for track ID {track_id}. Requesting next frame.")
+                return True, face_box_norm, "Analyzing...", None, 1.0
+            elif liveness_status == 'Spoof':
+                logger.warning(f"Liveness spoof attack detected for track ID {track_id}. Blocking.")
+                return True, face_box_norm, "Spoof/Attack", None, 1.0
 
             # 2. Align face image for feature extraction
             aligned_face = align_face(person_crop, landmarks)

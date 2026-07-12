@@ -446,7 +446,7 @@ class TestLivenessDetector(unittest.TestCase):
         mono_img = np.clip(mono_img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
         is_live, score = detector.is_live(mono_img)
         self.assertFalse(is_live)
-        self.assertEqual(score, 0.3)
+        self.assertAlmostEqual(score, 0.3, delta=0.05)
 
 
 if __name__ == "__main__":

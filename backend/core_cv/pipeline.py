@@ -289,7 +289,18 @@ class AlarmWorker(threading.Thread):
                     object_id = item.get("object_id")
                     duration = item.get("duration", 0)
                     
-                    if zone_id and object_id:
+                    if item["alarm_type"] == "人脸欺骗告警":
+                        dingtalk_alert_id = f"db_event_{event.id}"
+                        success = alert_handler.handle_spoof_alert(
+                            object_id=object_id,
+                            camera_id=item["camera_id"],
+                            alert_id=dingtalk_alert_id
+                        )
+                        if success:
+                            logger.info(f"DingTalk spoof alarm notification sent via alert_handler. Alert ID: {dingtalk_alert_id}")
+                        else:
+                            logger.warning("Failed to send DingTalk spoof notification via alert_handler.")
+                    elif zone_id and object_id:
                         # Use database event ID as alert ID for later acknowledgment
                         dingtalk_alert_id = f"db_event_{event.id}"
                         
@@ -327,6 +338,7 @@ class CameraPipeline:
         self.tracker = SimpleTracker()
         self.zones = []
         self.temporal_filter = {} # Map object_id -> list of names for temporal filtering
+        self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
         
         self.last_clean_time = time.time()
         self.latest_processed_frame = None
@@ -364,6 +376,7 @@ class CameraPipeline:
             for active_id in list(self.temporal_filter.keys()):
                 if active_id not in tracks:
                     self.temporal_filter.pop(active_id, None)
+                    self.triggered_spoofs.discard(active_id)
 
             # Map track IDs
             for det in detections:
@@ -386,40 +399,67 @@ class CameraPipeline:
                     continue
 
                 face_found, face_box_norm, name, user_id, dist = self.face_recognizer.detect_and_recognize_in_person(
-                    frame, det["box"]
+                    frame, det["box"], track_id=obj_id
                 )
 
-                # Push to temporal filter sliding window and cap history size to 15
-                if obj_id not in self.temporal_filter:
-                    self.temporal_filter[obj_id] = []
-                self.temporal_filter[obj_id].append(name)
-                if len(self.temporal_filter[obj_id]) > 15:
-                    self.temporal_filter[obj_id].pop(0)
+                if name == "Spoof/Attack":
+                    consensus_name = "Spoof/Attack"
+                    # Trigger DingTalk and Alarm Event immediately
+                    if obj_id not in self.triggered_spoofs:
+                        self.triggered_spoofs.add(obj_id)
+                        
+                        coordinate_info = {
+                            "person_box": det["box_norm"],
+                            "face_box": face_box_norm if face_found else None
+                        }
+                        alarm_data = {
+                            "alarm_type": "人脸欺骗告警",
+                            "level": "high",
+                            "camera_id": self.camera_id,
+                            "coordinate": coordinate_info,
+                            "snapshot_frame": frame.copy(),
+                            "name": "Spoof/Attack",
+                            "object_id": obj_id,
+                        }
+                        try:
+                            alarm_queue.put_nowait(alarm_data)
+                            logger.info(f"Spoof attack alarm pushed to queue for Object {obj_id}")
+                        except queue.Full:
+                            pass
+                elif name == "Analyzing...":
+                    consensus_name = "Analyzing..."
+                else:
+                    # Push to temporal filter sliding window and cap history size to 15
+                    if obj_id not in self.temporal_filter:
+                        self.temporal_filter[obj_id] = []
+                    self.temporal_filter[obj_id].append(name)
+                    if len(self.temporal_filter[obj_id]) > 15:
+                        self.temporal_filter[obj_id].pop(0)
 
-                # Consensus Decision
-                hist = self.temporal_filter[obj_id]
-                consensus_name = "Stranger"
-                if hist:
-                    # 1. Quick Pass (last 3 frames, known user matching frequency >= 2)
-                    recent_3 = hist[-3:]
-                    non_strangers_3 = [n for n in recent_3 if n != "Stranger"]
-                    if len(non_strangers_3) >= 2:
-                        counts_3 = {}
-                        for n in non_strangers_3:
-                            counts_3[n] = counts_3.get(n, 0) + 1
-                        top_name_3 = max(counts_3, key=counts_3.get)
-                        if counts_3[top_name_3] >= 2:
-                            consensus_name = top_name_3
+                    # Consensus Decision
+                    hist = self.temporal_filter[obj_id]
+                    consensus_name = "Stranger"
+                    if hist:
+                        # 1. Quick Pass (last 3 frames, known user matching frequency >= 2)
+                        recent_3 = hist[-3:]
+                        non_strangers_3 = [n for n in recent_3 if n != "Stranger"]
+                        if len(non_strangers_3) >= 2:
+                            counts_3 = {}
+                            for n in non_strangers_3:
+                                counts_3[n] = counts_3.get(n, 0) + 1
+                            top_name_3 = max(counts_3, key=counts_3.get)
+                            if counts_3[top_name_3] >= 2:
+                                consensus_name = top_name_3
 
-                    # 2. Slow Pass (last 5 frames, known user matching frequency >= 60%)
-                    if consensus_name == "Stranger":
-                        recent_5 = hist[-5:]
-                        counts = {}
-                        for n in recent_5:
-                            counts[n] = counts.get(n, 0) + 1
-                        best_name = max(counts, key=counts.get)
-                        if best_name != "Stranger" and (counts[best_name] / len(recent_5)) >= 0.6:
-                            consensus_name = best_name
+                        # 2. Slow Pass (last 5 frames, known user matching frequency >= 60%)
+                        if consensus_name == "Stranger":
+                            recent_5 = hist[-5:]
+                            counts = {}
+                            for n in recent_5:
+                                counts[n] = counts.get(n, 0) + 1
+                            best_name = max(counts, key=counts.get)
+                            if best_name != "Stranger" and (counts[best_name] / len(recent_5)) >= 0.6:
+                                consensus_name = best_name
 
                 results.append({
                     "box": det["box"],
@@ -431,6 +471,9 @@ class CameraPipeline:
                 })
 
                 # Evaluate zones
+                if consensus_name in ("Spoof/Attack", "Analyzing..."):
+                    continue
+
                 zones = list(self.zones)
                 for zone in zones:
                     if not zone.get("enabled", True):

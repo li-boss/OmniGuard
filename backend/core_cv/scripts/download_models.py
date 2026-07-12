@@ -12,14 +12,18 @@ MODELS = {
     "arcface_w600k_r50.onnx": [
         "https://hf-mirror.com/public-data/insightface/resolve/main/models/buffalo_l/w600k_r50.onnx",
         "https://huggingface.co/public-data/insightface/resolve/main/models/buffalo_l/w600k_r50.onnx"
+    ],
+    "2.7_80x80_MiniFASNetV2.onnx": [
+        "https://raw.githubusercontent.com/QingHeYang/Silent-Face-Anti-Spoofing-onnx/main/onnx/2.7_80x80_MiniFASNetV2.onnx",
+        "https://ghproxy.cn/https://raw.githubusercontent.com/QingHeYang/Silent-Face-Anti-Spoofing-onnx/main/onnx/2.7_80x80_MiniFASNetV2.onnx"
     ]
 }
 
 def download_required_models():
     for name, urls in MODELS.items():
         path = os.path.join(WEIGHTS_DIR, name)
-        if os.path.exists(path) and os.path.getsize(path) > 100 * 1024 * 1024:
-            # Model exists and size is reasonable (>100MB)
+        if os.path.exists(path) and os.path.getsize(path) > 100 * 1024:
+            # Model exists and size is reasonable (>100KB)
             logger.info(f"Model file {name} already exists and is valid.")
             continue
 

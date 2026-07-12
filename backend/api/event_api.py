@@ -298,7 +298,7 @@ def serialize_event(event):
         "handledAt": event.handle_time.isoformat() + 'Z' if event.handle_time else None,
         "handle_time": event.handle_time.isoformat() + 'Z' if event.handle_time else None,
         
-        "title": f"围栏入侵 - 摄像头 {event.camera_id}",
+        "title": f"{event.alarm_type} - 摄像头 {event.camera_id}",
         "description": event.description or f"目标触发 {event.type} 规则",
         
         "clip_url": event.clip_url,

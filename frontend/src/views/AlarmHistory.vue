@@ -46,6 +46,19 @@ function formatTime(value) {
   return value ? new Date(value).toLocaleString() : '-'
 }
 
+const snapshotPlaceholder = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72"><rect width="100%" height="100%" fill="#f2f3f5"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="#909399" font-size="14">暂无图片</text></svg>'
+)
+
+function snapshotSrc(row) {
+  return row.snapshot_url || row.snapshotUrl || snapshotPlaceholder
+}
+
+function useSnapshotPlaceholder(event) {
+  event.target.onerror = null
+  event.target.src = snapshotPlaceholder
+}
+
 function releaseVideoUrl() {
   if (videoUrl.value) {
     URL.revokeObjectURL(videoUrl.value)
@@ -94,6 +107,16 @@ onBeforeUnmount(releaseVideoUrl)
 
     <el-table :data="alarms.items" table-layout="fixed">
       <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column label="告警图片" width="150">
+        <template #default="{ row }">
+          <img
+            :src="snapshotSrc(row)"
+            alt="告警抓拍图"
+            class="alarm-snapshot"
+            @error="useSnapshotPlaceholder"
+          >
+        </template>
+      </el-table-column>
       <el-table-column prop="title" label="标题" min-width="180" />
       <el-table-column prop="cameraId" label="摄像头" width="120" />
       <el-table-column prop="severity" label="等级" width="100" />
@@ -151,3 +174,14 @@ onBeforeUnmount(releaseVideoUrl)
     </el-dialog>
   </section>
 </template>
+
+<style scoped>
+.alarm-snapshot {
+  display: block;
+  width: 120px;
+  height: 72px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #f2f3f5;
+}
+</style>

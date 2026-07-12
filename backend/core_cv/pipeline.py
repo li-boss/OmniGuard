@@ -226,32 +226,40 @@ class AlarmWorker(threading.Thread):
     def save_and_broadcast_alarm(self, item):
         with self.app.app_context():
             try:
-                # 1. Create snapshot path and save image
-                static_dir = os.path.join(self.app.root_path, 'static', 'snapshots')
-                os.makedirs(static_dir, exist_ok=True)
-                
-                timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                filename = f"{item['camera_id']}_{timestamp_str}.jpg"
-                abs_path = os.path.join(static_dir, filename)
-                rel_path = f"/static/snapshots/{filename}"
-                
-                cv2.imwrite(abs_path, item["snapshot_frame"])
-                logger.info(f"Snapshot saved to {abs_path}")
-                
-                # 2. Save AlarmEvent to database
+                # Save the alarm first so its stable ID can be used in the filename.
                 event = AlarmEvent(
                     alarm_type=item["alarm_type"],
                     level=item["level"],
                     camera_id=item["camera_id"],
                     coordinate=item["coordinate"],
                     status="pending",
-                    snapshot_path=rel_path,
                     triggered_at=item.get("triggered_at"),
                     created_at=datetime.utcnow()
                 )
                 db.session.add(event)
                 db.session.commit()
                 logger.info(f"AlarmEvent saved to DB: ID {event.id}")
+
+                # Snapshot persistence is best-effort and must not block the alarm.
+                try:
+                    static_dir = os.path.join(self.app.root_path, 'static', 'snapshots')
+                    os.makedirs(static_dir, exist_ok=True)
+                    filename = f"alarm_{event.id}.jpg"
+                    abs_path = os.path.join(static_dir, filename)
+                    rel_path = f"/static/snapshots/{filename}"
+                    if not cv2.imwrite(abs_path, item["snapshot_frame"]):
+                        raise OSError(f"cv2.imwrite returned false for {abs_path}")
+                    event.snapshot_path = rel_path
+                    db.session.commit()
+                    logger.info(f"Snapshot saved to {abs_path}")
+                except Exception as snapshot_error:
+                    db.session.rollback()
+                    logger.error(
+                        "Failed to save snapshot for alarm %s: %s",
+                        event.id,
+                        snapshot_error,
+                    )
+
                 self.video_recorder.start_recording(
                     event.id,
                     event.camera_id,

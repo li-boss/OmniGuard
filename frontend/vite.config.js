@@ -27,6 +27,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': apiTarget,
+      '/static': apiTarget,
       '/socket.io': {
         target: apiTarget,
         ws: true,

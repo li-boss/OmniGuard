@@ -95,6 +95,7 @@ def create_alarm():
         camera_id=camera_id,
         zone_id=data.get('zone_id') or data.get('zoneId'),
         snapshot_url=data.get('snapshot_url') or data.get('snapshot_path') or data.get('snapshotUrl'),
+        snapshot_path=data.get('snapshot_path') or data.get('snapshot_url') or data.get('snapshotUrl'),
         clip_url=data.get('clip_url') or data.get('clipUrl'),
         description=data.get('description'),
         detection_data=data.get('detection_data'),
@@ -280,6 +281,25 @@ def delete_alarm(alarm_id):
                 exc,
             )
 
+    snapshot_dir = Path(event_bp.root_path).parent / "static" / "snapshots"
+    snapshot_paths = {
+        stored_path
+        for stored_path in (alarm.snapshot_path, alarm.snapshot_url)
+        if stored_path
+    }
+    snapshot_filenames = {Path(stored_path).name for stored_path in snapshot_paths}
+    snapshot_filenames.add(f"alarm_{alarm_id}.jpg")
+    for filename in snapshot_filenames:
+        try:
+            (snapshot_dir / filename).unlink(missing_ok=True)
+        except OSError as exc:
+            current_app.logger.warning(
+                "Failed to delete alarm snapshot %s for alarm %s: %s",
+                filename,
+                alarm_id,
+                exc,
+            )
+
     db.session.delete(alarm)
     db.session.commit()
     return jsonify({
@@ -296,6 +316,7 @@ def serialize_event(event):
     }
     frontend_status = status_map.get(event.status, event.status)
     video_url = f"/api/alarms/{event.id}/video" if event.video_path else None
+    snapshot_url = event.snapshot_path or event.snapshot_url
     
     return {
         "id": event.id,
@@ -314,9 +335,9 @@ def serialize_event(event):
         "status": frontend_status,
         "confidence": 0.95,
         
-        "snapshotUrl": event.snapshot_url,
-        "snapshot_url": event.snapshot_url,
-        "snapshot_path": event.snapshot_url,
+        "snapshotUrl": snapshot_url,
+        "snapshot_url": snapshot_url,
+        "snapshot_path": snapshot_url,
         
         "occurredAt": event.created_at.isoformat() + 'Z' if event.created_at else None,
         "created_at": event.created_at.isoformat() + 'Z' if event.created_at else None,

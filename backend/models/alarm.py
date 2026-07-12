@@ -12,6 +12,7 @@ class AlarmEvent(db.Model):
     camera_id = db.Column(db.String(100), nullable=False, index=True)
     zone_id = db.Column(db.Integer, nullable=True)
     snapshot_url = db.Column(db.String(500), nullable=True)
+    snapshot_path = db.Column(db.String(500), nullable=True)
     clip_url = db.Column(db.String(500), nullable=True)
     video_path = db.Column(db.String(500), nullable=True)
     description = db.Column(db.Text, nullable=True)
@@ -38,8 +39,6 @@ class AlarmEvent(db.Model):
     def __init__(self, **kwargs):
         if "level" in kwargs:
             kwargs["severity"] = kwargs.pop("level")
-        if "snapshot_path" in kwargs:
-            kwargs["snapshot_url"] = kwargs.pop("snapshot_path")
         if "handled_at" in kwargs:
             kwargs["handle_time"] = kwargs.pop("handled_at")
         super().__init__(**kwargs)
@@ -61,14 +60,6 @@ class AlarmEvent(db.Model):
         self.severity = value
 
     @property
-    def snapshot_path(self):
-        return self.snapshot_url
-
-    @snapshot_path.setter
-    def snapshot_path(self, value):
-        self.snapshot_url = value
-
-    @property
     def handled_at(self):
         return self.handle_time
 
@@ -83,7 +74,8 @@ class AlarmEvent(db.Model):
             'severity': self.severity,
             'camera_id': self.camera_id,
             'zone_id': self.zone_id,
-            'snapshot_url': self.snapshot_url,
+            'snapshot_url': self.snapshot_path or self.snapshot_url,
+            'snapshot_path': self.snapshot_path or self.snapshot_url,
             'clip_url': self.clip_url,
             'video_path': self.video_path,
             'description': self.description,

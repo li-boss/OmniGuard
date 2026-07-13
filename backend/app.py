@@ -89,7 +89,9 @@ def create_app(config_class=Config):
     ModelLoader.warmup()
     
     # Initialize and start the CameraPipelineManager
-    manager = CameraPipelineManager(app)
+    app.pipeline_manager = CameraPipelineManager(app)
+    manager = app.pipeline_manager
+
     if not app.testing:
         if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             manager.start()

@@ -34,16 +34,23 @@ export const useAlarmsStore = defineStore('alarms', {
       this.total = Math.max(0, this.total - 1)
     },
     receiveAlarm(alarm) {
-      if (!alarm?.id) return
+      console.log('[Store] receiveAlarm 收到:', alarm?.id, alarm?.alarm_type, alarm)
+      if (!alarm?.id) {
+        console.warn('[Store] 忽略无效 alarm (缺少 id):', alarm)
+        return
+      }
       const index = this.items.findIndex((item) => item.id === alarm.id)
+      console.log('[Store] items 中找到 index:', index, '| items 长度:', this.items.length)
       if (index >= 0) {
         const updatedAlarm = { ...this.items[index], ...alarm }
         this.items[index] = updatedAlarm
         this.popup = updatedAlarm
+        console.log('[Store] 更新已有 alarm, popup 已设置:', updatedAlarm.id)
       } else {
         this.popup = alarm
         this.items = [alarm, ...this.items].slice(0, 50)
         this.total += 1
+        console.log('[Store] 新 alarm, popup 已设置:', alarm.id)
       }
     },
     closePopup() {

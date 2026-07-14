@@ -72,6 +72,10 @@ class LivenessDetector:
                         cached["consecutive_anomalies"] += 1
                     else:
                         cached["consecutive_anomalies"] = 0
+                        # Auto-extend TTL (max 30s)
+                        remaining = cached["expire"] - now
+                        if remaining < 25.0:
+                            cached["expire"] = now + min(remaining + 3.0, 30.0)
                         
                     # Update box reference
                     cached["last_box"] = face_box
@@ -94,12 +98,27 @@ class LivenessDetector:
         probs = self.classifier.predict(session, crop)
         P_fas = float(probs[0][1])  # Class 1 is Real
         
-        # 2. Laplacian Variance (clarity)
+        # 2. P_fas hard gate: MiniFASNetV2 is the authority on spoof detection.
+        #    High-quality printed photos / phone screens can have good Laplacian
+        #    clarity and HSV color range, fooling the heuristic-only check.
+        #    If the deep model is confident it's fake (P_fas <= 0.20), trust it.
+        if P_fas <= 0.20:
+            return 'Spoof'
+        if P_fas >= 0.80:
+            if track_id is not None:
+                self.live_cache[track_id] = {
+                    "expire": now + 8.0,
+                    "consecutive_anomalies": 0,
+                    "last_box": face_box
+                }
+            return 'Live'
+        
+        # 3. Laplacian Variance (clarity)
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
         laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
         Var_lap_norm = min(1.0, laplacian_var / 300.0)
         
-        # 3. HSV saturation/value variance (reflections and flat color distributions)
+        # 4. HSV saturation/value variance (reflections and flat color distributions)
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         h_chan, s_chan, v_chan = cv2.split(hsv)
         std_s = float(np.std(s_chan))
@@ -108,7 +127,7 @@ class LivenessDetector:
         std_v_norm = min(1.0, std_v / 30.0)
         Std_hsv_norm = 0.5 * std_s_norm + 0.5 * std_v_norm
         
-        # 4. Box motion penalty
+        # 5. Box motion penalty
         Penalty_box = 0.0
         if track_id is not None:
             prev_entry = self.live_cache.get(track_id)
@@ -121,24 +140,24 @@ class LivenessDetector:
                 norm_dist = np.sqrt((cx - lcx)**2 + (cy - lcy)**2) / max(lw, lh) if max(lw, lh) > 0 else 0.0
                 
                 # Single frame jump penalty
-                if area_ratio < 0.8 or area_ratio > 1.25 or norm_dist > 0.15:
-                    Penalty_box = 0.2
+                if area_ratio < 0.6 or area_ratio > 1.6 or norm_dist > 0.25:
+                    Penalty_box = 0.1
         
-        # 5. Hybrid decision fusion
+        # 6. Hybrid decision fusion
         Score = self.w1 * P_fas + self.w2 * Var_lap_norm + self.w3 * Std_hsv_norm - Penalty_box
         Score = max(0.0, min(1.0, Score))
         
         logger.debug(f"Liveness ID {track_id}: Score: {Score:.2f} (P_fas: {P_fas:.2f}, Laplacian: {laplacian_var:.1f}, HSV: {std_s:.1f}/{std_v:.1f}, Penalty: {Penalty_box:.1f})")
         
-        if Score >= 0.3:
+        if Score >= 0.25:
             if track_id is not None:
                 self.live_cache[track_id] = {
-                    "expire": now + 3.0,
+                    "expire": now + 8.0,
                     "consecutive_anomalies": 0,
                     "last_box": face_box
                 }
             return 'Live'
-        elif Score <= 0.1:
+        elif Score <= 0.10:
             return 'Spoof'
         else:
             # Intermediate state, request next frame

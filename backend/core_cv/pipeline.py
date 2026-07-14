@@ -422,6 +422,7 @@ class CameraPipeline:
         self.tracker = SimpleTracker()
         self.zones = []
         self.temporal_filter = {} # Map object_id -> list of names for temporal filtering
+        self.spoof_temporal_filter = {} # Map object_id -> list of spoof states for temporal consensus
         self.track_face_cache = {} # Map object_id -> relative face box cache for interpolation
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
         self.triggered_falls = set()  # Track already triggered fall alarms
@@ -531,6 +532,7 @@ class CameraPipeline:
             for active_id in list(self.temporal_filter.keys()):
                 if active_id not in tracks:
                     self.temporal_filter.pop(active_id, None)
+                    self.spoof_temporal_filter.pop(active_id, None)
                     self.track_face_cache.pop(active_id, None)
                     self.triggered_spoofs.discard(active_id)
                     self.triggered_falls.discard(active_id)
@@ -658,31 +660,44 @@ class CameraPipeline:
 
                 if name == "Spoof/Attack":
                     consensus_name = "Spoof/Attack"
-                    # Trigger DingTalk and Alarm Event immediately
-                    if obj_id not in self.triggered_spoofs:
-                        self.triggered_spoofs.add(obj_id)
-                        
-                        coordinate_info = {
-                            "person_box": det["box_norm"],
-                            "face_box": face_box_norm if face_found else None
-                        }
-                        alarm_data = {
-                            "alarm_type": "人脸欺骗告警",
-                            "level": "high",
-                            "camera_id": self.camera_id,
-                            "coordinate": coordinate_info,
-                            "snapshot_frame": frame.copy(),
-                            "name": "Spoof/Attack",
-                            "object_id": obj_id,
-                        }
-                        try:
-                            alarm_queue.put_nowait(alarm_data)
-                            logger.info(f"Spoof attack alarm pushed to queue for Object {obj_id}")
-                        except queue.Full:
-                            pass
+                    # --- Temporal consensus for spoof detection ---
+                    # Push to spoof temporal filter, require 4 consecutive spoof frames
+                    if obj_id not in self.spoof_temporal_filter:
+                        self.spoof_temporal_filter[obj_id] = []
+                    self.spoof_temporal_filter[obj_id].append("spoof")
+                    if len(self.spoof_temporal_filter[obj_id]) > 15:
+                        self.spoof_temporal_filter[obj_id].pop(0)
+                    
+                    hist = self.spoof_temporal_filter[obj_id]
+                    if len(hist) >= 4 and all(s == "spoof" for s in hist[-4:]):
+                        if obj_id not in self.triggered_spoofs:
+                            self.triggered_spoofs.add(obj_id)
+                            
+                            coordinate_info = {
+                                "person_box": det["box_norm"],
+                                "face_box": face_box_norm if face_found else None
+                            }
+                            alarm_data = {
+                                "alarm_type": "人脸欺骗告警",
+                                "level": "high",
+                                "camera_id": self.camera_id,
+                                "coordinate": coordinate_info,
+                                "snapshot_frame": frame.copy(),
+                                "name": "Spoof/Attack",
+                                "object_id": obj_id,
+                            }
+                            try:
+                                alarm_queue.put_nowait(alarm_data)
+                                logger.info(f"Spoof attack alarm pushed to queue for Object {obj_id} (4 consecutive frames)")
+                            except queue.Full:
+                                pass
                 elif name == "Analyzing...":
                     consensus_name = "Analyzing..."
+                    # Clear spoof temporal filter when not spoof (reset chain counter)
+                    self.spoof_temporal_filter.pop(obj_id, None)
                 else:
+                    # Clear spoof temporal filter when not spoof (reset chain counter)
+                    self.spoof_temporal_filter.pop(obj_id, None)
                     # Push to temporal filter sliding window and cap history size to 15
                     if obj_id not in self.temporal_filter:
                         self.temporal_filter[obj_id] = []

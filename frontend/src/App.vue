@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Users,
   FileText,
+  DoorOpen,
 } from '@lucide/vue'
 
 import AlarmPopup from './components/AlarmPopup.vue'
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/dashboard', label: '大盘', icon: ChartNoAxesCombined },
   { path: '/alarms', label: '告警', icon: Bell },
   { path: '/reports', label: '日报', icon: FileText },
+  { path: '/access-history', label: '通行', icon: DoorOpen },
   { path: '/zones', label: '围栏', icon: Map },
   { path: '/faces', label: '人脸', icon: Users },
 ]

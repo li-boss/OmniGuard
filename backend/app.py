@@ -80,11 +80,13 @@ def create_app(config_class=Config):
     from api.stream_api import stream_bp
     from api.alert_api import alert_bp
     from api.report_api import report_bp
+    from api.access_log_api import access_log_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(log_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
     app.register_blueprint(report_bp, url_prefix="/api/reports")
+    app.register_blueprint(access_log_bp)
 
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
 

@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from . import db
 
-def utc_now():
-    return datetime.now(timezone.utc)
+def local_now():
+    return datetime.now()
 
 class AccessLog(db.Model):
     """通行日志表。"""
@@ -24,8 +24,8 @@ class AccessLog(db.Model):
     confidence = db.Column(db.Float, nullable=True)
     remark = db.Column(db.String(255), nullable=True)
 
-    occurred_at = db.Column(db.DateTime, nullable=False, default=utc_now)
-    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    occurred_at = db.Column(db.DateTime, nullable=False, default=local_now)
+    created_at = db.Column(db.DateTime, nullable=False, default=local_now)
 
     user = db.relationship("User", back_populates="access_logs")
     zone = db.relationship("AlertZone", backref=db.backref("access_logs", lazy=True))

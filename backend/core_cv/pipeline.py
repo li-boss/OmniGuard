@@ -426,7 +426,7 @@ class CameraPipeline:
         self.triggered_falls = set()  # Track already triggered fall alarms
         self.triggered_fires = set()  # Track already triggered fire alarms
         self._last_access_log_at = {}
-        self._access_log_cooldown_seconds = 10.0
+        self._access_log_cooldown_seconds = 1800.0
         
         # Initialize fall and fire detectors if available
         self.fall_detector = None
@@ -460,7 +460,7 @@ class CameraPipeline:
         self.inference_worker.start()
         self.video_recorder = get_alarm_video_recorder(app)
 
-    def _record_recognized_access(self, user_id):
+    def _record_recognized_access(self, user_id, zone_id=None, confidence=None):
         """Persist one face access event per user/camera within the cooldown window."""
         if user_id is None:
             return
@@ -475,17 +475,19 @@ class CameraPipeline:
         self._last_access_log_at[user_id] = now
         try:
             with self.app.app_context():
-                recognized_at = datetime.utcnow()
+                recognized_at = datetime.now()
                 RegisteredFace.query.filter_by(user_id=user_id).update(
                     {"last_recognized_at": recognized_at},
                     synchronize_session=False,
                 )
                 db.session.add(AccessLog(
                     user_id=user_id,
+                    zone_id=zone_id,
                     access_method="face",
                     direction="in",
                     result="granted",
                     device_code=str(self.camera_id),
+                    confidence=confidence,
                     remark="摄像头人脸识别",
                 ))
                 db.session.commit()
@@ -557,7 +559,17 @@ class CameraPipeline:
                 )
 
                 if user_id is not None:
-                    self._record_recognized_access(user_id)
+                    zone_id = None
+                    box_norm = det.get("box_norm")
+                    if box_norm:
+                        point = self.rule_engine.get_center(box_norm)
+                        for zone in self.zones:
+                            if zone.get("enabled", True):
+                                if self.rule_engine.point_in_polygon(point, zone.get("polygon", [])):
+                                    zone_id = zone.get("id")
+                                    break
+                    confidence = 1.0 - min(dist, 1.0)
+                    self._record_recognized_access(user_id, zone_id=zone_id, confidence=confidence)
 
                 # ========== 异常检测（跌倒和火情）==========
                 # 跌倒检测

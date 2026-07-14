@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 from flask import Flask
 from flask_cors import CORS
+from dotenv import load_dotenv
 
 # Configure logging at application startup
 logging.basicConfig(
@@ -10,6 +11,7 @@ logging.basicConfig(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR.parent / ".env")
 from flask_jwt_extended import JWTManager
 from services.ws_handler import socketio
 jwt = JWTManager()
@@ -24,11 +26,20 @@ from models import db
 
 def create_app(config_class=Config):
     app = Flask(__name__)
+    # Flask resolves relative SQLite URLs under the instance directory.
+    # A fresh clone does not contain this ignored runtime directory yet.
+    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     if isinstance(config_class, dict):
         app.config.from_object(Config)
         app.config.update(config_class)
     else:
         app.config.from_object(config_class)
+
+    # The audio service is process-wide and lazy-loaded. Synchronize it with
+    # the resolved Flask configuration before the first request/inference.
+    from services.multimodal_fusion import semantic_detector
+    semantic_detector.enabled = bool(app.config.get("AUDIO_SEMANTIC_ENABLED", False))
+    semantic_detector.model_url = app.config.get("YAMNET_MODEL_URL", semantic_detector.model_url)
 
     if app.testing:
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{BASE_DIR / 'instance' / 'test_temp.db'}"
@@ -58,10 +69,12 @@ def create_app(config_class=Config):
     from api.log_api import log_bp
     from api.stream_api import stream_bp
     from api.alert_api import alert_bp
+    from api.multimodal_api import multimodal_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(log_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
+    app.register_blueprint(multimodal_bp, url_prefix="/api/multimodal")
 
     # Ensure directories exist
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
@@ -121,6 +134,12 @@ def create_app(config_class=Config):
             alert_handler = get_alert_handler()
             alert_handler.start()
             atexit.register(alert_handler.stop)
+
+            from services.camera_audio_monitor import CameraAudioMonitor
+            audio_monitor = CameraAudioMonitor(app)
+            app.config['audio_monitor'] = audio_monitor
+            audio_monitor.start()
+            atexit.register(audio_monitor.stop)
 
     return app
 

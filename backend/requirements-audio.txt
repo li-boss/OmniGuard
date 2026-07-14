@@ -1,0 +1,6 @@
+# Optional semantic audio classification. Install this in a Python version
+# supported by TensorFlow, then set AUDIO_SEMANTIC_ENABLED=true.
+-r requirements.txt
+setuptools<81
+tensorflow-cpu>=2.16,<2.22
+tensorflow-hub>=0.16,<0.17

@@ -221,7 +221,12 @@ class StreamManager:
     def get_latest_frame(self, base_timeout_ms=1000):
         if self._is_local_camera():
             from services.rtmp_pusher import rtmp_pusher_svc
-            return rtmp_pusher_svc.get_latest_frame()
+            frame = rtmp_pusher_svc.get_latest_frame()
+            with self._lock:
+                self.connected = frame is not None
+                if frame is not None:
+                    self.consecutive_failures = 0
+            return frame
 
         # Automatically start the background thread if it is not running
         if not self.running:

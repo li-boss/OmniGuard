@@ -14,6 +14,7 @@ from .stream_manager import StreamManager
 from .yolo_detector import YoloDetector
 from .face_recognizer import FaceRecognizer
 from .rule_engine import RuleEngine
+from services.multimodal_fusion import fusion_engine
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,9 @@ class AlarmWorker(threading.Thread):
                     level=item["level"],
                     camera_id=item["camera_id"],
                     coordinate=item["coordinate"],
+                    zone_id=item.get("zone_id"),
+                    description=item.get("description"),
+                    detection_data=item.get("detection_data"),
                     status="pending",
                     snapshot_path=rel_path,
                     created_at=datetime.utcnow()
@@ -339,6 +343,7 @@ class CameraPipeline:
         self.zones = []
         self.temporal_filter = {} # Map object_id -> list of names for temporal filtering
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
+        self.multimodal_alarm_times = {}
         
         self.last_clean_time = time.time()
         self.latest_processed_frame = None
@@ -478,6 +483,34 @@ class CameraPipeline:
                 for zone in zones:
                     if not zone.get("enabled", True):
                         continue
+
+                    point = self.rule_engine.get_center(det["box_norm"])
+                    in_zone = self.rule_engine.point_in_polygon(point, zone.get("polygon", []))
+                    fusion_decision = fusion_engine.evaluate(self.camera_id, obj_id, in_zone=in_zone)
+                    fusion_key = (zone.get("id"), obj_id)
+                    last_fusion_alarm = self.multimodal_alarm_times.get(fusion_key, 0.0)
+                    if fusion_decision.triggered and time.time() - last_fusion_alarm >= Config.ALARM_COOLDOWN_SECONDS:
+                        self.multimodal_alarm_times[fusion_key] = time.time()
+                        try:
+                            alarm_queue.put_nowait({
+                                "alarm_type": "multimodal_anomaly",
+                                "level": fusion_decision.severity,
+                                "camera_id": self.camera_id,
+                                "coordinate": {
+                                    "person_box": det["box_norm"],
+                                    "face_box": face_box_norm if face_found else None,
+                                },
+                                "snapshot_frame": frame.copy(),
+                                "name": consensus_name,
+                                "zone_id": zone.get("id"),
+                                "zone_name": zone.get("name"),
+                                "object_id": obj_id,
+                                "duration": 0,
+                                "description": "Audio/emotion/electronic-fence linked anomaly",
+                                "detection_data": fusion_decision.to_dict(),
+                            })
+                        except queue.Full:
+                            logger.warning("Multimodal alarm queue is full")
 
                     should_trigger, duration = self.rule_engine.evaluate_stay(
                         object_id=obj_id,

@@ -79,3 +79,29 @@ Socket.IO 事件：
 - `get_face_detector()`
 - `get_face_recognizer()`
 - `warmup()`
+# 多模态异常检测与主动活体
+
+## 音视频联动
+
+系统通过 5 秒滑动窗口融合三类证据：异常声音、人员情绪和电子围栏状态。单个弱信号不会直接产生高等级告警；尖叫/呼救等强声音可以独立触发，愤怒情绪与人员进入布防区同时出现时会触发联动告警。
+
+- `POST /api/multimodal/audio-events`：接收 YAMNet 或其他声音分类器输出的标签与置信度。
+- `POST /api/multimodal/emotion-events`：接收人脸情绪模型按跟踪对象输出的情绪与置信度。
+- `POST /api/multimodal/evaluate`：结合人员是否处于布防区进行判定并创建告警。
+- `POST /api/multimodal/analyze-wav`：对 16-bit PCM WAV 做轻量声学异常候选检测。该接口只识别高能量声学候选，不把音量阈值误报为语义明确的“打架”。
+
+建议生产环境将 YAMNet 的 `Screaming`、`Shout`、`Yell`、`Glass breaking` 等标签接入 `audio-events`；“打架/争吵”需要使用现场数据微调的专用音频或音视频模型。
+
+浏览器实时麦克风采集、WAV 分段分析、可选 YAMNet 语义分类及运行配置见 [audio_detection.md](audio_detection.md)。
+
+## Aurora Guard 与随机动作
+
+Aurora Guard 使用终端屏幕显示随机颜色/强度序列（light CAPTCHA），再通过人脸反射响应和深度分支联合判活。它要求可控光源与近距离摄像头，适用于门禁终端，不应直接套用到远距离监控流。
+
+本项目保留原有 MiniFASNet 被动活体，并增加门禁侧随机动作挑战状态机：
+
+- `POST /api/multimodal/liveness/challenges`：生成 2–4 个随机动作；
+- `POST /api/multimodal/liveness/challenges/{id}/observations`：按顺序提交 `turn_left`、`turn_right`、`blink`、`open_mouth` 识别结果；
+- `GET /api/multimodal/liveness/challenges/{id}`：查询挑战进度。
+
+动作识别结果必须由门禁端的人脸关键点模型产生，服务端只接受置信度不低于 0.7、顺序正确且未超时的动作。后续接入真正的 Aurora Guard 时，应新增屏幕光序列生成、逐帧时间同步和光反射回归模型，不能仅用随机动作替代论文中的 light CAPTCHA。

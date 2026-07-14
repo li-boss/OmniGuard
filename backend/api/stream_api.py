@@ -296,3 +296,14 @@ def toggle_cam1_source():
             "source": new_source
         }
     }
+
+
+@stream_bp.get("/cam-1/status")
+def get_local_camera_status():
+    from services.rtmp_pusher import rtmp_pusher_svc
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": rtmp_pusher_svc.get_status(),
+    }

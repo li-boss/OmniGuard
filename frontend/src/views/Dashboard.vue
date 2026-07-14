@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { Bell, Map, Radio, Users } from '@lucide/vue'
 
 import VideoPlayer from '../components/VideoPlayer.vue'
+import SoundMonitor from '../components/SoundMonitor.vue'
 import { getSummary } from '../api/dashboard'
 import { useAlarmsStore } from '../store/alarms'
 import { useCameraStore } from '../store/camera'
@@ -72,14 +73,17 @@ onMounted(load)
     </section>
 
     <div class="dashboard-main">
-      <div class="video-grid">
-        <VideoPlayer
-          v-for="cam in camera.cameras"
-          :key="cam.id"
-          :id="cam.id"
-          :src="cam.streamUrl"
-          :title="cam.name"
-        />
+      <div>
+        <div class="video-grid">
+          <VideoPlayer
+            v-for="cam in camera.cameras"
+            :key="cam.id"
+            :id="cam.id"
+            :src="cam.streamUrl"
+            :title="cam.name"
+          />
+        </div>
+        <SoundMonitor :cameras="camera.cameras" :default-camera-id="camera.selectedCameraId" />
       </div>
 
       <section class="panel">

@@ -14,6 +14,19 @@ function Test-PortListening {
     return $null -ne $connection
 }
 
+function Test-ProjectPort {
+    param([int]$Port)
+
+    $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $connection) {
+        return $false
+    }
+
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($connection.OwningProcess)" -ErrorAction SilentlyContinue
+    return $null -ne $process -and $process.CommandLine -like "*$root*"
+}
+
 function Find-FreePort {
     param([int]$StartPort)
     $port = $StartPort
@@ -23,18 +36,12 @@ function Find-FreePort {
     return $port
 }
 
-$backendPort = Find-FreePort 5000
-$frontendPort = Find-FreePort 5173
+# Prefer ports separate from other local projects. Reuse them when this project
+# is already running; otherwise move to the next available port.
+$backendPort = if ((Test-ProjectPort 5001) -or -not (Test-PortListening 5001)) { 5001 } else { Find-FreePort 5002 }
+$frontendPort = if ((Test-ProjectPort 5174) -or -not (Test-PortListening 5174)) { 5174 } else { Find-FreePort 5175 }
 $frontendOrigin = "http://127.0.0.1:$frontendPort"
 $apiTarget = "http://127.0.0.1:$backendPort"
-
-if ($backendPort -ne 5000) {
-    Write-Output "Port 5000 is busy. Using backend port $backendPort."
-}
-
-if ($frontendPort -ne 5173) {
-    Write-Output "Port 5173 is busy. Using frontend port $frontendPort."
-}
 
 if (-not (Test-PortListening $backendPort)) {
     Start-Process powershell -WindowStyle Hidden -ArgumentList @(

@@ -384,6 +384,17 @@ class AlarmWorker(threading.Thread):
                             logger.info(f"DingTalk spoof alarm notification sent via alert_handler. Alert ID: {dingtalk_alert_id}")
                         else:
                             logger.warning("Failed to send DingTalk spoof notification via alert_handler.")
+                    elif item["alarm_type"] == "识别到陌生人":
+                        dingtalk_alert_id = f"db_event_{event.id}"
+                        success = alert_handler.handle_face_alert(
+                            user_name=f"未知人员(ID:{object_id})",
+                            confidence=0.0,
+                            camera_id=item["camera_id"]
+                        )
+                        if success:
+                            logger.info(f"DingTalk stranger alarm notification sent via alert_handler. Alert ID: {dingtalk_alert_id}")
+                        else:
+                            logger.warning("Failed to send DingTalk stranger notification via alert_handler.")
                     elif zone_id and object_id:
                         # Use database event ID as alert ID for later acknowledgment
                         dingtalk_alert_id = f"db_event_{event.id}"
@@ -394,7 +405,8 @@ class AlarmWorker(threading.Thread):
                             object_id=object_id,
                             duration=duration,
                             camera_id=item["camera_id"],
-                            alert_id=dingtalk_alert_id
+                            alert_id=dingtalk_alert_id,
+                            alarm_type=item["alarm_type"]
                         )
                         if success:
                             logger.info(f"DingTalk alarm notification sent via alert_handler. Alert ID: {dingtalk_alert_id}")
@@ -426,6 +438,7 @@ class CameraPipeline:
         self.track_face_cache = {} # Map object_id -> relative face box cache for interpolation
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
         self.triggered_falls = set()  # Track already triggered fall alarms
+        self.triggered_strangers = set()  # Track already triggered stranger alarms
         self.last_fire_alarm_time = 0  # Track last fire alarm time to avoid spamming
         self._last_access_log_at = {}
         self._access_log_cooldown_seconds = 18000.0
@@ -536,6 +549,7 @@ class CameraPipeline:
                     self.track_face_cache.pop(active_id, None)
                     self.triggered_spoofs.discard(active_id)
                     self.triggered_falls.discard(active_id)
+                    self.triggered_strangers.discard(active_id)
 
 
             # Map track IDs
@@ -739,14 +753,82 @@ class CameraPipeline:
                     "name": consensus_name
                 })
 
-                # Evaluate zones
-                if consensus_name in ("Spoof/Attack", "Analyzing..."):
-                    continue
+                # ========== 陌生人检测告警 ==========
+                if consensus_name == "Stranger" and obj_id not in self.triggered_strangers:
+                    self.triggered_strangers.add(obj_id)
+                    coordinate_info = {
+                        "person_box": det["box_norm"],
+                        "face_box": face_box_norm if face_found else None
+                    }
+                    alarm_data = {
+                        "alarm_type": "识别到陌生人",
+                        "level": "medium",
+                        "camera_id": self.camera_id,
+                        "coordinate": coordinate_info,
+                        "snapshot_frame": frame.copy(),
+                        "name": "Stranger",
+                        "object_id": obj_id,
+                    }
+                    try:
+                        alarm_queue.put_nowait(alarm_data)
+                        logger.info(f"Stranger alarm pushed to queue for Object {obj_id}")
+                    except queue.Full:
+                        pass
 
+                # Evaluate zones — all targets (including Analyzing/Spoof) are evaluated
+                # to prevent missed zone alerts during face analysis delays
                 zones = list(self.zones)
                 for zone in zones:
                     if not zone.get("enabled", True):
                         continue
+
+                    # Map face analysis states to display names for zone alarms.
+                    # "Analyzing..." and "Spoof/Attack" targets still trigger zone
+                    # protection, but are labeled as "Stranger" / high severity.
+                    if consensus_name in ("Analyzing...", "Spoof/Attack", "Stranger"):
+                        zone_display_name = "Stranger"
+                        zone_level = "high"
+                    else:
+                        zone_display_name = consensus_name
+                        zone_level = "medium"
+
+                    should_trigger_entry = self.rule_engine.evaluate_entry(
+                        object_id=obj_id,
+                        box_norm=det["box_norm"],
+                        zone=zone
+                    )
+
+                    if should_trigger_entry:
+                        triggered_at = datetime.utcnow()
+                        triggered_monotonic = time.monotonic()
+                        logger.warning(f"Entry alert triggered for Object {obj_id} in Zone {zone['name']}")
+                        coordinate_info = {
+                            "person_box": det["box_norm"],
+                            "face_box": face_box_norm if face_found else None
+                        }
+                        alarm_data = {
+                            "alarm_type": "进入告警",
+                            "level": zone_level,
+                            "camera_id": self.camera_id,
+                            "coordinate": coordinate_info,
+                            "snapshot_frame": frame.copy(),
+                            "name": zone_display_name,
+                            "zone_id": zone.get("id"),
+                            "zone_name": zone.get("name"),
+                            "object_id": obj_id,
+                            "duration": 0.0,
+                            "description": f"检测到人员已进入电子围栏【{zone.get('name')}】",
+                            "triggered_at": triggered_at,
+                            "triggered_monotonic": triggered_monotonic
+                        }
+                        try:
+                            alarm_queue.put_nowait(alarm_data)
+                        except queue.Full:
+                            try:
+                                alarm_queue.get_nowait()
+                            except queue.Empty:
+                                pass
+                            alarm_queue.put_nowait(alarm_data)
 
                     should_trigger, duration = self.rule_engine.evaluate_stay(
                         object_id=obj_id,
@@ -763,16 +845,17 @@ class CameraPipeline:
                             "face_box": face_box_norm if face_found else None
                         }
                         alarm_data = {
-                            "alarm_type": "electronic_fence",
-                            "level": "medium" if consensus_name != "Stranger" else "high",
+                            "alarm_type": "停留告警",
+                            "level": zone_level,
                             "camera_id": self.camera_id,
                             "coordinate": coordinate_info,
                             "snapshot_frame": frame.copy(),
-                            "name": consensus_name,
+                            "name": zone_display_name,
                             "zone_id": zone.get("id"),
                             "zone_name": zone.get("name"),
                             "object_id": obj_id,
                             "duration": duration,
+                            "description": f"检测到人员在电子围栏【{zone.get('name')}】内已停留超过 {zone.get('stay_seconds', 5)} 秒",
                             "triggered_at": triggered_at,
                             "triggered_monotonic": triggered_monotonic
                         }
@@ -849,7 +932,7 @@ class CameraPipeline:
         # Draw overlays under lock to avoid race conditions
         with self.results_lock:
             results = list(self.latest_detection_results)
-            results_fresh = (time.time() - self.last_inference_time < 1.5)
+            results_fresh = (time.time() - self.last_inference_time < 3.0)
 
         # Track which zones have people inside
         zones_with_people = set()

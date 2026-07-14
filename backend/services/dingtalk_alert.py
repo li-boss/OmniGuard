@@ -86,6 +86,8 @@ class DingTalkConfig:
     # 告警类型与责任人映射
     ALERT_TYPE_PERSON_MAPPING = {
         "围栏入侵告警": "wang_shihan",
+        "进入告警": "wang_shihan",
+        "停留告警": "wang_shihan",
         "陌生人告警": "wang_jinghang",
         "异常活动告警": "min_shiyu",
 

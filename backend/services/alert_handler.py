@@ -23,7 +23,8 @@ class AlertEventHandler:
         object_id: int,
         duration: float,
         camera_id: str = "cam-1",
-        alert_id: Optional[str] = None
+        alert_id: Optional[str] = None,
+        alarm_type: str = "进入告警"
     ) -> bool:
         """
         处理围栏告警
@@ -35,6 +36,7 @@ class AlertEventHandler:
             duration: 停留时长（秒）
             camera_id: 摄像头ID
             alert_id: 告警ID（可选，如果不提供则自动生成）
+            alarm_type: 告警类型 ("进入告警" or "停留告警")
         
         Returns:
             是否处理成功
@@ -54,12 +56,11 @@ class AlertEventHandler:
             else:
                 alert_level = "low"
             
-            # 获取责任人（根据告警类型自动选择）
-            # 围栏入侵告警 -> 汪士涵
-            # 不再需要手动指定，由 dingtalk_alert.py 根据告警类型自动选择
-            
             # 构建告警消息
-            alert_message = f"人员(ID:{object_id})在围栏【{zone_name}】内停留{duration:.1f}秒"
+            if alarm_type == "进入告警":
+                alert_message = f"人员(ID:{object_id})已进入围栏【{zone_name}】"
+            else:
+                alert_message = f"人员(ID:{object_id})在围栏【{zone_name}】内已停留{duration:.1f}秒"
             
             # 额外信息
             extra_info = {
@@ -72,7 +73,7 @@ class AlertEventHandler:
             return self.alert_service.send_alert(
                 alert_id=alert_id,
                 alert_level=alert_level,
-                alert_type="围栏入侵告警",
+                alert_type=alarm_type,
                 alert_message=alert_message,
                 extra_info=extra_info
             )

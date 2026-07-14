@@ -1,0 +1,6 @@
+# Full runtime requirements, including semantic YAMNet audio classification.
+# setup.ps1 installs this file by default for a clone-and-run experience.
+-r requirements.txt
+setuptools<81
+tensorflow-cpu>=2.16,<2.22
+tensorflow-hub>=0.16,<0.17

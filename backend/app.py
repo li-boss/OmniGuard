@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 from flask import Flask
 from flask_cors import CORS
+from flasgger import Swagger
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,7 @@ from api.rule_api import rule_bp, camera_bp
 from api.user_api import auth_bp, user_bp
 from config import Config
 from models import db
+from swagger_docs import SWAGGER_CONFIG, SWAGGER_TEMPLATE
 
 
 def create_app(config_class=Config):
@@ -42,6 +44,7 @@ def create_app(config_class=Config):
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     db.init_app(app)
     jwt.init_app(app)
+    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
     
     from flask import jsonify
     from flask_jwt_extended.exceptions import JWTExtendedException

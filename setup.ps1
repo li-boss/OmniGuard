@@ -1,3 +1,8 @@
+[CmdletBinding()]
+param(
+    [switch]$SkipSemanticAudio
+)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -17,7 +22,16 @@ if (-not (Test-Path $pythonExe)) {
 }
 
 & $pythonExe -m pip install --upgrade pip
-& $pythonExe -m pip install -r (Join-Path $root 'backend\requirements.txt')
+if ($SkipSemanticAudio) {
+    & $pythonExe -m pip install -r (Join-Path $root 'backend\requirements.txt')
+} else {
+    Write-Output 'Installing semantic audio detection dependencies...'
+    & $pythonExe -m pip install -r (Join-Path $root 'backend\requirements-audio.txt')
+
+    Write-Output 'Downloading and caching the YAMNet audio model...'
+    $env:TF_CPP_MIN_LOG_LEVEL = '2'
+    & $pythonExe -c "import tensorflow_hub as hub; hub.load('https://tfhub.dev/google/yamnet/1'); print('YAMNet is ready.')"
+}
 
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     throw 'npm is missing. Install Node.js first.'
@@ -27,4 +41,8 @@ Push-Location (Join-Path $root 'frontend')
 npm install
 Pop-Location
 
-Write-Output 'Environment is ready. Run .\start-dev.ps1 to start services.'
+if ($SkipSemanticAudio) {
+    Write-Output 'Environment is ready with lightweight audio detection. Run .\start-dev.ps1 to start services.'
+} else {
+    Write-Output 'Environment is ready, including YAMNet audio detection. Run .\start-dev.ps1 to start services.'
+}

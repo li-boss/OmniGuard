@@ -12,14 +12,22 @@ POST /api/multimodal/analyze-wav
 
 每个摄像头默认有 30 秒声音告警冷却期，避免连续音频切片重复创建相同告警。新告警会写入数据库并通过 Socket.IO 推送到前端。
 
-## 启用 YAMNet
+## 一键安装与启用 YAMNet
 
-YAMNet 是可选依赖。建议使用 TensorFlow 当前支持的 Python 版本建立部署环境，然后执行：
+Windows 用户克隆 `msy` 分支后直接运行 `one-click.ps1`。脚本会创建虚拟环境、安装完整依赖、下载并缓存 YAMNet，然后启动前后端：
+
+```powershell
+.\one-click.ps1
+```
+
+如需手动安装，则执行：
 
 ```powershell
 pip install -r backend/requirements-audio.txt
 $env:AUDIO_SEMANTIC_ENABLED = 'true'
 ```
+
+只有明确不需要语义声学模型时，才使用 `.\setup.ps1 -SkipSemanticAudio` 跳过 TensorFlow/YAMNet 安装；轻量声学候选检测仍可运行。
 
 首次识别时会从 TensorFlow Hub 加载官方模型并缓存。无法安装或加载 TensorFlow 时，基础检测器仍会继续工作，状态和错误可从以下接口读取：
 
@@ -30,7 +38,7 @@ GET /api/multimodal/audio-status
 ## 配置
 
 ```dotenv
-AUDIO_SEMANTIC_ENABLED=false
+AUDIO_SEMANTIC_ENABLED=true
 YAMNET_MODEL_URL=https://tfhub.dev/google/yamnet/1
 AUDIO_CHUNK_SECONDS=0.5
 AUDIO_ALARM_COOLDOWN_SECONDS=30

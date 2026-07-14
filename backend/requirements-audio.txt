@@ -1,5 +1,5 @@
-# Optional semantic audio classification. Install this in a Python version
-# supported by TensorFlow, then set AUDIO_SEMANTIC_ENABLED=true.
+# Full runtime requirements, including semantic YAMNet audio classification.
+# setup.ps1 installs this file by default for a clone-and-run experience.
 -r requirements.txt
 setuptools<81
 tensorflow-cpu>=2.16,<2.22

@@ -18,7 +18,7 @@ try {
     $pythonDependenciesReady = $false
     if (Test-Path $pythonExe) {
         try {
-            & $pythonExe -c 'import flask_jwt_extended, waitress' 2>$null
+            & $pythonExe -c 'import flask_jwt_extended, waitress, tensorflow, tensorflow_hub' 2>$null
             $pythonDependenciesReady = $LASTEXITCODE -eq 0
         } catch {
             $pythonDependenciesReady = $false
@@ -95,7 +95,7 @@ try {
 } catch {
     Write-Host ''
     Write-Host "Startup failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host 'Check that Python 3 and Node.js (npm) are installed.' -ForegroundColor Yellow
+    Write-Host 'Check that 64-bit Python 3 and Node.js (npm) are installed and the first-run model download can access the internet.' -ForegroundColor Yellow
     exit 1
 } finally {
     Set-Location $root

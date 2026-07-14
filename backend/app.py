@@ -169,13 +169,13 @@ def create_app(config_class=Config):
             try:
                 from services.multimodal_fusion import semantic_detector
                 if semantic_detector.enabled:
-                    logger.info("Preloading YAMNet model...")
+                    logging.info("Preloading YAMNet model...")
                     # Trigger lazy loading with a dummy audio sample
                     import numpy as np
                     semantic_detector.analyze(np.zeros(16000, dtype=np.float32), 16000)
-                    logger.info("YAMNet model preloaded successfully")
+                    logging.info("YAMNet model preloaded successfully")
             except Exception as e:
-                logger.warning(f"Failed to preload YAMNet model: {e}")
+                logging.warning(f"Failed to preload YAMNet model: {e}")
 
     return app
 

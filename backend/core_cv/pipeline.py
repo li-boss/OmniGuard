@@ -426,7 +426,8 @@ class CameraPipeline:
         self.triggered_falls = set()  # Track already triggered fall alarms
         self.triggered_fires = set()  # Track already triggered fire alarms
         self._last_access_log_at = {}
-        self._access_log_cooldown_seconds = 1800.0
+        # Suppress per-frame duplicates while allowing a later re-entry to be logged.
+        self._access_log_cooldown_seconds = 10.0
         
         # Initialize fall and fire detectors if available
         self.fall_detector = None

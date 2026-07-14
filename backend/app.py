@@ -76,13 +76,11 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
 
     from api.face_api import face_bp
-    from api.log_api import log_bp
     from api.stream_api import stream_bp
     from api.alert_api import alert_bp
     from api.report_api import report_bp
     from api.access_log_api import access_log_bp
     app.register_blueprint(face_bp)
-    app.register_blueprint(log_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
     app.register_blueprint(report_bp, url_prefix="/api/reports")

@@ -80,6 +80,7 @@ SWAGGER_TEMPLATE = {
         {"name": "认证", "description": "用户注册、登录与令牌刷新"},
         {"name": "用户", "description": "当前用户信息与密码管理"},
         {"name": "人脸", "description": "人脸注册、查询和删除"},
+        {"name": "通行日志", "description": "人员通行记录查询、详情和删除"},
         {"name": "告警", "description": "告警查询、详情、录像和删除"},
         {"name": "视频流", "description": "实时 MJPEG 视频流"},
     ],
@@ -209,6 +210,58 @@ SWAGGER_TEMPLATE = {
                     "500": response("数据库删除失败", ERROR_RESPONSE),
                 },
             }
+        },
+        "/api/access-logs": {
+            "get": {
+                "tags": ["通行日志"],
+                "summary": "分页查询通行日志",
+                "description": "普通用户只能查询自己的记录；管理员和安保人员可以查询全部记录。",
+                "security": SECURITY,
+                "parameters": [
+                    {"in": "query", "name": "page", "type": "integer", "default": 1},
+                    {"in": "query", "name": "pageSize", "type": "integer", "default": 20, "minimum": 1, "maximum": 100},
+                    {"in": "query", "name": "user_id", "type": "integer"},
+                    {"in": "query", "name": "zone_id", "type": "integer"},
+                    {"in": "query", "name": "access_method", "type": "string", "example": "face"},
+                    {"in": "query", "name": "result", "type": "string", "example": "granted"},
+                    {"in": "query", "name": "device_code", "type": "string", "example": "cam-1"},
+                    {"in": "query", "name": "start_time", "type": "string", "format": "date-time"},
+                    {"in": "query", "name": "end_time", "type": "string", "format": "date-time"},
+                ],
+                "responses": {
+                    "200": response("通行日志分页数据，data 包含 items、total、page、pageSize 和 pages"),
+                    "401": response("未认证", ERROR_RESPONSE),
+                    "403": response("普通用户尝试查询其他用户记录", ERROR_RESPONSE),
+                },
+            }
+        },
+        "/api/access-logs/{log_id}": {
+            "get": {
+                "tags": ["通行日志"],
+                "summary": "查询通行日志详情",
+                "description": "普通用户只能查看自己的记录；管理员和安保人员可以查看全部记录。",
+                "security": SECURITY,
+                "parameters": [{"in": "path", "name": "log_id", "type": "integer", "required": True}],
+                "responses": {
+                    "200": response("通行日志详情"),
+                    "401": response("未认证", ERROR_RESPONSE),
+                    "403": response("权限不足", ERROR_RESPONSE),
+                    "404": response("通行日志不存在", ERROR_RESPONSE),
+                },
+            },
+            "delete": {
+                "tags": ["通行日志"],
+                "summary": "删除通行日志",
+                "description": "仅管理员和安保人员可以删除通行日志。",
+                "security": SECURITY,
+                "parameters": [{"in": "path", "name": "log_id", "type": "integer", "required": True}],
+                "responses": {
+                    "200": response("删除成功"),
+                    "401": response("未认证", ERROR_RESPONSE),
+                    "403": response("权限不足", ERROR_RESPONSE),
+                    "404": response("通行日志不存在", ERROR_RESPONSE),
+                },
+            },
         },
         "/api/alarms": {
             "get": {

@@ -196,17 +196,23 @@ class YamnetAudioClassifier:
             try:
                 import tensorflow as tf
                 import tensorflow_hub as hub
+                logger.info(f"Loading YAMNet model from {self.model_url}...")
             except ImportError as exc:
                 raise RuntimeError(
                     "YAMNet dependencies are missing; install backend/requirements-audio.txt"
                 ) from exc
-            model = hub.load(self.model_url)
-            class_map_path = model.class_map_path().numpy()
-            if isinstance(class_map_path, bytes):
-                class_map_path = class_map_path.decode("utf-8")
-            with tf.io.gfile.GFile(class_map_path) as handle:
-                self._class_names = [row["display_name"] for row in csv.DictReader(handle)]
-            self._model = model
+            try:
+                model = hub.load(self.model_url)
+                class_map_path = model.class_map_path().numpy()
+                if isinstance(class_map_path, bytes):
+                    class_map_path = class_map_path.decode("utf-8")
+                with tf.io.gfile.GFile(class_map_path) as handle:
+                    self._class_names = [row["display_name"] for row in csv.DictReader(handle)]
+                self._model = model
+                logger.info(f"YAMNet model loaded successfully with {len(self._class_names)} classes")
+            except Exception as e:
+                logger.error(f"Failed to load YAMNet model: {e}")
+                raise
 
     @staticmethod
     def _resample(samples, source_rate, target_rate):

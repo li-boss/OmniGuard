@@ -137,7 +137,7 @@ class YamnetAudioClassifier:
 
     def __init__(self, enabled=None, model_url=None):
         if enabled is None:
-            enabled = os.getenv("AUDIO_SEMANTIC_ENABLED", "false").lower() in {"1", "true", "yes"}
+            enabled = os.getenv("AUDIO_SEMANTIC_ENABLED", "true").lower() in {"1", "true", "yes"}
         self.enabled = bool(enabled)
         self.model_url = model_url or os.getenv("YAMNET_MODEL_URL", "https://tfhub.dev/google/yamnet/1")
         self._model = None

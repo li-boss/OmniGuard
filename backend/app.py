@@ -10,6 +10,11 @@ logging.basicConfig(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
+
 from flask_jwt_extended import JWTManager
 from services.ws_handler import socketio
 jwt = JWTManager()
@@ -80,11 +85,13 @@ def create_app(config_class=Config):
     from api.alert_api import alert_bp
     from api.report_api import report_bp
     from api.access_log_api import access_log_bp
+    from api.multimodal_api import multimodal_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
     app.register_blueprint(report_bp, url_prefix="/api/reports")
     app.register_blueprint(access_log_bp)
+    app.register_blueprint(multimodal_bp, url_prefix="/api/multimodal")
 
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
 
@@ -152,6 +159,11 @@ def create_app(config_class=Config):
             alert_handler = get_alert_handler()
             alert_handler.start()
             atexit.register(alert_handler.stop)
+            
+            from services.camera_audio_monitor import CameraAudioMonitor
+            camera_audio_monitor = CameraAudioMonitor(app)
+            camera_audio_monitor.start()
+            atexit.register(camera_audio_monitor.stop)
 
     return app
 

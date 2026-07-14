@@ -6,6 +6,7 @@ import FaceAccess from '../views/FaceAccess.vue'
 import Login from '../views/Login.vue'
 import PerimeterConfig from '../views/PerimeterConfig.vue'
 import DailyReport from '../views/DailyReport.vue'
+import AccessHistory from '../views/AccessHistory.vue'
 import { useAuthStore } from '../store/auth'
 
 const routes = [
@@ -40,6 +41,12 @@ const routes = [
     name: 'reports',
     component: DailyReport,
     meta: { title: '日报列表', requiresAuth: true },
+  },
+  {
+    path: '/access-history',
+    name: 'access-history',
+    component: AccessHistory,
+    meta: { title: '通行历史', requiresAuth: true },
   },
 ]
 

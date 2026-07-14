@@ -6,77 +6,62 @@ pipeline {
     }
     
     stages {
-        stage('Setup Environment') {
+        stage('Frontend Dependencies') {
             steps {
                 script {
                     sh '''
-                        # 安装 Node.js (如果没有)
-                        if ! command -v node &> /dev/null; then
-                            echo "Installing Node.js..."
-                            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-                            apt-get install -y nodejs
-                        fi
-                        
-                        # 安装 Python pip (如果没有)
-                        if ! command -v pip &> /dev/null; then
-                            echo "Installing pip..."
-                            apt-get update
-                            apt-get install -y python3-pip
-                        fi
+                        docker run --rm -v $PWD:/app -w /app/frontend node:18-alpine sh -c "npm install"
                     '''
                 }
             }
         }
         
-        stage('Install Dependencies') {
-            parallel {
-                stage('Frontend Dependencies') {
-                    steps {
-                        dir('frontend') {
-                            sh 'npm install || true'
-                        }
-                    }
-                }
-                stage('Backend Dependencies') {
-                    steps {
-                        dir('backend') {
-                            sh 'pip3 install -r requirements.txt || true'
-                            sh 'pip3 install flake8 pytest pytest-cov || true'
-                        }
-                    }
+        stage('Backend Dependencies') {
+            steps {
+                script {
+                    sh '''
+                        docker run --rm -v $PWD:/app -w /app/backend python:3.9-slim sh -c "pip install -r requirements.txt && pip install flake8 pytest pytest-cov"
+                    '''
                 }
             }
         }
         
         stage('Frontend Lint') {
             steps {
-                dir('frontend') {
-                    sh 'npx eslint src/ || true'
+                script {
+                    sh '''
+                        docker run --rm -v $PWD:/app -w /app/frontend node:18-alpine sh -c "npx eslint src/ || true"
+                    '''
                 }
             }
         }
         
         stage('Frontend Build') {
             steps {
-                dir('frontend') {
-                    sh 'npm run build || true'
+                script {
+                    sh '''
+                        docker run --rm -v $PWD:/app -w /app/frontend node:18-alpine sh -c "npm run build"
+                    '''
                 }
             }
         }
         
         stage('Backend Lint') {
             steps {
-                dir('backend') {
-                    sh 'python3 -m flake8 . --config=.flake8 || true'
+                script {
+                    sh '''
+                        docker run --rm -v $PWD:/app -w /app/backend python:3.9-slim sh -c "python -m flake8 . --config=.flake8 || true"
+                    '''
                 }
             }
         }
         
         stage('Backend Test') {
             steps {
-                dir('backend') {
-                    sh 'mkdir -p tests/reports || true'
-                    sh 'python3 -m pytest tests/ -v --tb=short || true'
+                script {
+                    sh '''
+                        docker run --rm -v $PWD:/app -w /app/backend python:3.9-slim sh -c "mkdir -p tests/reports && python -m pytest tests/ -v --tb=short || true"
+                    '''
                 }
             }
         }

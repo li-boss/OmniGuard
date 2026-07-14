@@ -11,14 +11,21 @@ $setupScript = Join-Path $root 'setup.ps1'
 $startScript = Join-Path $root 'start-dev.ps1'
 $pythonExe = Join-Path $root '.venv\Scripts\python.exe'
 $nodeModules = Join-Path $root 'frontend\node_modules'
+$arcFaceModel = Join-Path $root 'backend\core_cv\weights\arcface_w600k_r50.onnx'
+$livenessModel = Join-Path $root 'backend\core_cv\weights\2.7_80x80_MiniFASNetV2.onnx'
 
 try {
     Set-Location $root
 
     $pythonDependenciesReady = $false
+    $faceModelsReady =
+        (Test-Path $arcFaceModel) -and
+        (Test-Path $livenessModel) -and
+        ((Get-Item $arcFaceModel).Length -gt 100KB) -and
+        ((Get-Item $livenessModel).Length -gt 100KB)
     if (Test-Path $pythonExe) {
         try {
-            & $pythonExe -c 'import flask_jwt_extended, waitress, tensorflow, tensorflow_hub' 2>$null
+            & $pythonExe -c 'import flask_jwt_extended, waitress, onnxruntime, tensorflow, tensorflow_hub' 2>$null
             $pythonDependenciesReady = $LASTEXITCODE -eq 0
         } catch {
             $pythonDependenciesReady = $false
@@ -27,7 +34,7 @@ try {
 
     # Install dependencies on the first run, after requirements change, or
     # when explicitly requested.
-    if ($Reinstall -or -not $pythonDependenciesReady -or -not (Test-Path $nodeModules)) {
+    if ($Reinstall -or -not $pythonDependenciesReady -or -not $faceModelsReady -or -not (Test-Path $nodeModules)) {
         Write-Host 'Preparing the development environment...' -ForegroundColor Cyan
         & $setupScript
     }

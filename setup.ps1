@@ -33,6 +33,22 @@ if ($SkipSemanticAudio) {
     & $pythonExe -c "import tensorflow_hub as hub; hub.load('https://tfhub.dev/google/yamnet/1'); print('YAMNet is ready.')"
 }
 
+Write-Output 'Downloading face recognition and anti-spoofing models...'
+& $pythonExe (Join-Path $root 'backend\core_cv\scripts\download_models.py')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Failed to download the face recognition or MiniFASNet anti-spoofing model.'
+}
+
+Push-Location (Join-Path $root 'backend')
+try {
+    & $pythonExe -c "from core_cv.model_loader import ModelLoader; session = ModelLoader.get_liveness_net(); print('MiniFASNetV2 anti-spoofing is ready:', session.session.get_inputs()[0].shape)"
+    if ($LASTEXITCODE -ne 0) {
+        throw 'MiniFASNetV2 could not be loaded by ONNX Runtime.'
+    }
+} finally {
+    Pop-Location
+}
+
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     throw 'npm is missing. Install Node.js first.'
 }

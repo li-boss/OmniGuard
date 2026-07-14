@@ -448,6 +448,17 @@ class TestLivenessDetector(unittest.TestCase):
         self.assertFalse(is_live)
         self.assertAlmostEqual(score, 0.3, delta=0.05)
 
+    @patch("core_cv.model_loader.ModelLoader.get_liveness_net", side_effect=RuntimeError("model unavailable"))
+    def test_liveness_model_failure_is_fail_closed(self, _mock_model):
+        from core_cv.liveness_detector import LivenessDetector
+
+        detector = LivenessDetector()
+        face = np.ones((112, 112, 3), dtype=np.uint8) * 127
+        is_live, score = detector.is_live(face)
+
+        self.assertFalse(is_live)
+        self.assertEqual(score, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

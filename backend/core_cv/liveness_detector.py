@@ -190,4 +190,6 @@ class LivenessDetector:
             
         except Exception as e:
             logger.error(f"Error in legacy is_live method: {e}")
-            return True, 1.0
+            # Anti-spoofing must fail closed: an unavailable/corrupt model must
+            # never promote an unverified face to a live identity.
+            return False, 0.0

@@ -72,13 +72,15 @@ class FallDetector:
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
             if bbox is not None:
-                x, y, w, h = bbox
-                x = max(0, int(x))
-                y = max(0, int(y))
-                w = min(w, frame.shape[1] - x)
-                h = min(h, frame.shape[0] - y)
-                if w > 0 and h > 0:
-                    rgb_frame = rgb_frame[y:y+h, x:x+w]
+                x1, y1, x2, y2 = (int(value) for value in bbox)
+                frame_height, frame_width = frame.shape[:2]
+                x1 = max(0, min(frame_width, x1))
+                y1 = max(0, min(frame_height, y1))
+                x2 = max(0, min(frame_width, x2))
+                y2 = max(0, min(frame_height, y2))
+                if x2 <= x1 or y2 <= y1:
+                    return None
+                rgb_frame = rgb_frame[y1:y2, x1:x2]
             
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             
@@ -124,65 +126,102 @@ class FallDetector:
         left_ankle = landmarks[LEFT_ANKLE]
         right_ankle = landmarks[RIGHT_ANKLE]
         
-        required_keypoints = [
-            left_shoulder, right_shoulder,
-            left_hip, right_hip,
-            left_knee, right_knee,
-            left_ankle, right_ankle
+        required_keypoints = {
+            'left_shoulder': left_shoulder,
+            'right_shoulder': right_shoulder,
+            'left_hip': left_hip,
+            'right_hip': right_hip,
+            'left_knee': left_knee,
+            'right_knee': right_knee,
+            'left_ankle': left_ankle,
+            'right_ankle': right_ankle,
+        }
+        visible_keypoints = {
+            name: point
+            for name, point in required_keypoints.items()
+            if point.visibility >= MIN_VISIBILITY
+        }
+        visible_points = len(visible_keypoints)
+        visible_shoulders = [
+            point for point in (left_shoulder, right_shoulder)
+            if point.visibility >= MIN_VISIBILITY
         ]
-        
-        for kp in required_keypoints:
-            if kp.visibility < MIN_VISIBILITY:
-                logger.debug(f"Keypoint visibility too low: {kp.visibility:.2f}, skipping fall detection")
-                return False, 0.0, {'reason': 'incomplete_body', 'visibility': kp.visibility}
-        
-        shoulder_mid = self._get_midpoint(left_shoulder, right_shoulder)
-        hip_mid = self._get_midpoint(left_hip, right_hip)
+        visible_hips = [
+            point for point in (left_hip, right_hip)
+            if point.visibility >= MIN_VISIBILITY
+        ]
+
+        if visible_points < 6 or not visible_shoulders or not visible_hips:
+            logger.debug("Insufficient pose landmarks: %s/8 visible", visible_points)
+            return False, 0.0, {
+                'reason': 'incomplete_body',
+                'visible_points': visible_points,
+                'required_visible_points': 6,
+                'fall_indicators': [],
+                'complete_body': False,
+            }
+
+        shoulder_mid = self._get_average_point(visible_shoulders)
+        hip_mid = self._get_average_point(visible_hips)
         
         body_angle = self._calculate_angle_from_vertical(shoulder_mid, hip_mid)
         
         hip_height = hip_mid.y
-        ankle_avg_y = (left_ankle.y + right_ankle.y) / 2
-        relative_hip_height = ankle_avg_y - hip_height
-        
-        visibility = min(
-            left_shoulder.visibility, right_shoulder.visibility,
-            left_hip.visibility, right_hip.visibility,
-            left_knee.visibility, right_knee.visibility,
-            left_ankle.visibility, right_ankle.visibility
-        )
+        visible_ankles = [
+            point for point in (left_ankle, right_ankle)
+            if point.visibility >= MIN_VISIBILITY
+        ]
+        relative_hip_height = None
+        if visible_ankles:
+            ankle_avg_y = sum(point.y for point in visible_ankles) / len(visible_ankles)
+            relative_hip_height = ankle_avg_y - hip_height
+
+        visibility = min(point.visibility for point in visible_keypoints.values())
         
         fall_indicators = []
         
         if body_angle > self.angle_threshold:
             fall_indicators.append('body_tilt')
-        
-        if relative_hip_height < self.hip_height_threshold:
+
+        if body_angle > 60:
+            fall_indicators.append('horizontal_body')
+
+        if relative_hip_height is not None and relative_hip_height < self.hip_height_threshold:
             fall_indicators.append('low_hip')
         
-        knee_left_angle = self._calculate_angle(left_hip, left_knee, left_ankle)
-        knee_right_angle = self._calculate_angle(right_hip, right_knee, right_ankle)
-        avg_knee_angle = (knee_left_angle + knee_right_angle) / 2
-        if avg_knee_angle < 120:
+        knee_angles = []
+        if all(name in visible_keypoints for name in ('left_hip', 'left_knee', 'left_ankle')):
+            knee_angles.append(self._calculate_angle(left_hip, left_knee, left_ankle))
+        if all(name in visible_keypoints for name in ('right_hip', 'right_knee', 'right_ankle')):
+            knee_angles.append(self._calculate_angle(right_hip, right_knee, right_ankle))
+        avg_knee_angle = sum(knee_angles) / len(knee_angles) if knee_angles else None
+        if avg_knee_angle is not None and avg_knee_angle < 120:
             fall_indicators.append('bent_knees')
         
-        shoulder_width = abs(right_shoulder.x - left_shoulder.x)
-        hip_width = abs(right_hip.x - left_hip.x)
-        if shoulder_width > 0 and hip_width > 0:
-            width_ratio = shoulder_width / hip_width
-            if width_ratio > 1.5 or width_ratio < 0.67:
+        shoulder_hip_ratio = None
+        if all(name in visible_keypoints for name in ('left_shoulder', 'right_shoulder', 'left_hip', 'right_hip')):
+            shoulder_width = abs(right_shoulder.x - left_shoulder.x)
+            hip_width = abs(right_hip.x - left_hip.x)
+            if shoulder_width > 0 and hip_width > 0:
+                shoulder_hip_ratio = shoulder_width / hip_width
+            if shoulder_hip_ratio is not None and (shoulder_hip_ratio > 1.5 or shoulder_hip_ratio < 0.67):
                 fall_indicators.append('unusual_proportions')
         
-        fall_detected = len(fall_indicators) >= 1
+        has_horizontal_posture = 'horizontal_body' in fall_indicators
+        has_tilted_low_posture = 'body_tilt' in fall_indicators and 'low_hip' in fall_indicators
+        fall_detected = len(fall_indicators) >= 2 and (has_horizontal_posture or has_tilted_low_posture)
         confidence = visibility if fall_detected else 0.0
         
         details = {
             'body_angle': body_angle,
             'relative_hip_height': relative_hip_height,
             'knee_angle': avg_knee_angle,
+            'shoulder_hip_ratio': shoulder_hip_ratio,
             'fall_indicators': fall_indicators,
             'visibility': visibility,
-            'complete_body': True
+            'visible_points': visible_points,
+            'required_visible_points': 6,
+            'complete_body': visible_points == len(required_keypoints)
         }
         
         return fall_detected, confidence, details
@@ -202,6 +241,14 @@ class FallDetector:
             'x': (point1.x + point2.x) / 2,
             'y': (point1.y + point2.y) / 2,
             'z': (point1.z + point2.z) / 2
+        })()
+
+    def _get_average_point(self, points):
+        count = len(points)
+        return type('obj', (object,), {
+            'x': sum(point.x for point in points) / count,
+            'y': sum(point.y for point in points) / count,
+            'z': sum(point.z for point in points) / count,
         })()
     
     def _calculate_angle_from_vertical(self, point1, point2):

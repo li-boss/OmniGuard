@@ -1,0 +1,8 @@
+# Optional dependencies for YAMNet microphone and WAV detection.
+# Use a TensorFlow build compatible with the selected Python version.
+numpy>=1.26,<2
+tensorflow>=2.15
+tensorflow-hub>=0.16.1
+sounddevice>=0.4.6
+scipy>=1.14.1
+setuptools<81

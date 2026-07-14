@@ -1,0 +1,18 @@
+{
+  "model_url": "https://tfhub.dev/google/yamnet/1",
+  "model_cache_dir": "core_cv/weights/tfhub",
+  "local_model_dir": "core_cv/weights/yamnet",
+  "sample_rate": 16000,
+  "window_seconds": 0.96,
+  "hop_seconds": 0.24,
+  "input_device": null,
+  "camera_id": "cam-1",
+  "thresholds": {
+    "explosion": 0.01,
+    "glass_break": 0.01
+  },
+  "confirmation_count": 2,
+  "cooldown_seconds": 3.0,
+  "display_hold_seconds": 5.0,
+  "log_file": "logs/audio_alerts.log"
+}

@@ -33,6 +33,7 @@ class RtmpPusher:
             self.latest_frame = None
             self.frame_id = 0
             self.frame_lock = threading.Lock()
+            self.capture_backend = None
             self._initialized = True
 
     def start(self):
@@ -93,32 +94,63 @@ class RtmpPusher:
     def _capture_loop(self):
         while self.running:
             logger.info(f"RTMP Pusher capture thread connecting to camera {self.camera_index}...")
-            cap = cv2.VideoCapture(self.camera_index)
-            if not cap.isOpened():
+            cap, first_frame, backend_name = self._open_camera()
+            if cap is None:
                 logger.error(f"RTMP Pusher failed to open camera {self.camera_index}. Retrying in 5 seconds...")
-                cap.release()
                 time.sleep(5.0)
                 continue
 
-            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            cap.set(cv2.CAP_PROP_FPS, 30)
-
             with self._lock:
                 self.cap = cap
+                self.capture_backend = backend_name
 
-            logger.info("RTMP Pusher capture thread successfully opened camera.")
+            reported_fps = cap.get(cv2.CAP_PROP_FPS)
+            logger.info(
+                "RTMP Pusher capture thread successfully opened camera "
+                "with backend=%s configured_fps=%.2f.",
+                backend_name,
+                reported_fps,
+            )
+
+            frame = first_frame
+            frames_since_log = 0
+            log_started_at = time.monotonic()
+            logged_first_frame = False
 
             while self.running:
-                ok, frame = cap.read()
-                if not ok or frame is None:
-                    logger.warning("RTMP Pusher failed to read frame from camera.")
-                    break
+                if frame is None:
+                    ok, frame = cap.read()
+                    if not ok or frame is None:
+                        logger.warning(
+                            "RTMP Pusher failed to read frame from camera "
+                            "using backend=%s.",
+                            backend_name,
+                        )
+                        break
 
                 with self.frame_lock:
                     self.latest_frame = frame.copy()
                     self.frame_id += 1
+
+                frames_since_log += 1
+                elapsed = time.monotonic() - log_started_at
+                if not logged_first_frame or elapsed >= 10.0:
+                    height, width = frame.shape[:2]
+                    measured_fps = frames_since_log / elapsed if elapsed > 0 else reported_fps
+                    logger.info(
+                        "RTMP Pusher camera read success: frame_id=%s width=%s "
+                        "height=%s fps=%.2f backend=%s",
+                        self.frame_id,
+                        width,
+                        height,
+                        measured_fps,
+                        backend_name,
+                    )
+                    frames_since_log = 0
+                    log_started_at = time.monotonic()
+                    logged_first_frame = True
+
+                frame = None
 
                 time.sleep(0.001)
 
@@ -128,6 +160,46 @@ class RtmpPusher:
             cap.release()
             logger.warning("RTMP Pusher capture connection lost. Reconnecting in 3 seconds...")
             time.sleep(3.0)
+
+    def _open_camera(self):
+        backends = []
+        for backend_name in ("CAP_DSHOW", "CAP_MSMF", "CAP_ANY"):
+            backend = getattr(cv2, backend_name, None)
+            if backend is not None and backend not in backends:
+                backends.append(backend)
+
+        for backend in backends:
+            cap = cv2.VideoCapture(self.camera_index, backend)
+            if not cap.isOpened():
+                cap.release()
+                continue
+
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+
+            backend_name = cap.getBackendName()
+            first_frame = None
+            for _ in range(10):
+                ok, candidate = cap.read()
+                if ok and candidate is not None and candidate.size > 0:
+                    first_frame = candidate
+                    break
+                time.sleep(0.05)
+
+            if first_frame is not None:
+                return cap, first_frame, backend_name
+
+            logger.warning(
+                "RTMP Pusher camera opened with backend=%s but produced no valid frames; "
+                "trying the next backend.",
+                backend_name,
+            )
+            cap.release()
+
+        return None, None, None
 
     def _push_loop(self):
         while self.running:

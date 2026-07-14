@@ -7,6 +7,7 @@ import Login from '../views/Login.vue'
 import PerimeterConfig from '../views/PerimeterConfig.vue'
 import DailyReport from '../views/DailyReport.vue'
 import AccessHistory from '../views/AccessHistory.vue'
+import AudioDetection from '../views/AudioDetection.vue'
 import { useAuthStore } from '../store/auth'
 
 const routes = [
@@ -41,6 +42,12 @@ const routes = [
     name: 'reports',
     component: DailyReport,
     meta: { title: '日报列表', requiresAuth: true },
+  },
+  {
+    path: '/audio-detection',
+    name: 'audio-detection',
+    component: AudioDetection,
+    meta: { title: '异常声音监测', requiresAuth: true },
   },
   {
     path: '/access-history',

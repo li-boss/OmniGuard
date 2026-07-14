@@ -438,6 +438,9 @@ class CameraPipeline:
         self.track_face_cache = {} # Map object_id -> relative face box cache for interpolation
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
         self.triggered_falls = set()  # Track already triggered fall alarms
+        self.fall_confirmation_history = {}  # Recent fall decisions per tracked person
+        self.fall_confirmation_window = 5
+        self.fall_confirmation_required = 3
         self.triggered_strangers = set()  # Track already triggered stranger alarms
         self.last_fire_alarm_time = 0  # Track last fire alarm time to avoid spamming
         self._last_access_log_at = {}
@@ -527,6 +530,25 @@ class CameraPipeline:
         self.zones = zones
         logger.info(f"Updated {len(zones)} zones for camera {self.camera_id}")
 
+    def _confirm_fall(self, object_id, fall_result):
+        is_fall = bool(
+            fall_result
+            and fall_result.get("fall_detected", False)
+        )
+        history = self.fall_confirmation_history.setdefault(object_id, [])
+        history.append(is_fall)
+        if len(history) > self.fall_confirmation_window:
+            del history[:-self.fall_confirmation_window]
+
+        if (
+            len(history) < self.fall_confirmation_required
+            or sum(history) < self.fall_confirmation_required
+        ):
+            return False
+
+        self.fall_confirmation_history.pop(object_id, None)
+        return True
+
     def run_inference(self, frame):
         """Heavy AI inference (YOLO, Tracker, Face Recognition, Rules) running in thread pool."""
         now = time.time()
@@ -541,6 +563,10 @@ class CameraPipeline:
             person_boxes = [det["box"] for det in detections]
             tracks = self.tracker.update(person_boxes)
 
+            for active_id in list(self.fall_confirmation_history):
+                if active_id not in tracks:
+                    self.fall_confirmation_history.pop(active_id, None)
+
             # Prevent memory leak by removing stale tracking IDs from the temporal filter
             for active_id in list(self.temporal_filter.keys()):
                 if active_id not in tracks:
@@ -549,6 +575,7 @@ class CameraPipeline:
                     self.track_face_cache.pop(active_id, None)
                     self.triggered_spoofs.discard(active_id)
                     self.triggered_falls.discard(active_id)
+                    self.fall_confirmation_history.pop(active_id, None)
                     self.triggered_strangers.discard(active_id)
 
 
@@ -642,8 +669,8 @@ class CameraPipeline:
                 # 跌倒检测
                 if self.fall_detector and obj_id not in self.triggered_falls:
                     try:
-                        is_fall = self.fall_detector.detect(frame, det["box"])
-                        if is_fall:
+                        fall_result = self.fall_detector.detect(frame, det["box"])
+                        if self._confirm_fall(obj_id, fall_result):
                             self.triggered_falls.add(obj_id)
                             logger.warning(f"Fall detected for Object {obj_id} on camera {self.camera_id}")
                             
@@ -660,7 +687,13 @@ class CameraPipeline:
                                 "name": name if name != "Stranger" else "陌生人",
                                 "object_id": obj_id,
                                 "description": "检测到人员跌倒",
-                                "detection_data": {"type": "fall"}
+                                "triggered_at": datetime.utcnow(),
+                                "triggered_monotonic": time.monotonic(),
+                                "detection_data": {
+                                    "type": "fall",
+                                    "confidence": fall_result.get("confidence", 0.0),
+                                    "details": fall_result.get("details", {})
+                                }
                             }
                             try:
                                 alarm_queue.put_nowait(alarm_data)

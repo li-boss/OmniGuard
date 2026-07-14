@@ -80,11 +80,13 @@ def create_app(config_class=Config):
     from api.alert_api import alert_bp
     from api.report_api import report_bp
     from api.access_log_api import access_log_bp
+    from api.audio_api import audio_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
     app.register_blueprint(report_bp, url_prefix="/api/reports")
     app.register_blueprint(access_log_bp)
+    app.register_blueprint(audio_bp, url_prefix="/api/audio-detection")
 
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
 
@@ -152,6 +154,10 @@ def create_app(config_class=Config):
             alert_handler = get_alert_handler()
             alert_handler.start()
             atexit.register(alert_handler.stop)
+
+            from services.audio_event_detector import get_audio_event_detector
+            audio_event_detector = get_audio_event_detector(app)
+            atexit.register(audio_event_detector.stop)
 
     return app
 

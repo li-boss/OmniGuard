@@ -1,0 +1,1372 @@
+{
+  "rootHash": "f633b3bb7763315195330b292dd74258bb7c34e9d3d486e4b7476325bceff751",
+  "timestamp": 1783758539140,
+  "fileCount": 76,
+  "files": [
+    {
+      "path": "frontend\\.eslintrc.js",
+      "hash": "f2ec94fea701df11a7f8f52e2d98534e83123615258f13358d1275d81506019e",
+      "size": 176,
+      "modified": 1783758513197.3584
+    },
+    {
+      "path": "frontend\\vite.config.js",
+      "hash": "a3c96248e89304ca96df309822dbea0a936b1a48ebdaa9bb08c1b9ef7fda2abc",
+      "size": 719,
+      "modified": 1783758513203.526
+    },
+    {
+      "path": "frontend\\vitest.config.js",
+      "hash": "fe140ba72da048f9e61dc80b83f6b516db22d334b42f4fb0d1561cc350efa21e",
+      "size": 196,
+      "modified": 1783758513203.526
+    },
+    {
+      "path": "frontend\\src\\App.vue",
+      "hash": "cdb32ce7e9629300828ec3623f9fd5ba2e5a7fa1f8a28c80384a60674478906f",
+      "size": 2049,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\main.js",
+      "hash": "6b84c065a4f3e6a39c71c3cd57329b1ede4244b1a76ae8b439581c16c7009104",
+      "size": 302,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\views\\AlarmHistory.vue",
+      "hash": "e1b11aff27a7a9084e77b480fcdfaeb5b0ee91b16ae2d7fe9c974931e2d3d21f",
+      "size": 2722,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\views\\Dashboard.vue",
+      "hash": "8c2c3d01ad960ed9f6ab6b18242520acfece256172832d65b975f119e0928b34",
+      "size": 3165,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\views\\FaceAccess.vue",
+      "hash": "c0e08d269916bb9e40f30b371974160c38dae399b40a5e396ce70c5df9c98e72",
+      "size": 7574,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\views\\Login.vue",
+      "hash": "f8762d6d6780a6b4dedcb1c693457bffad12d2413b7f13163a8ed0c1a6cb4e22",
+      "size": 1501,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\views\\PerimeterConfig.vue",
+      "hash": "14d5a4fa237c734cdd3a21b42e8e97b82e1492dea7ddbfcac3bc5a4a5988491c",
+      "size": 2125,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\store\\alarms.js",
+      "hash": "cc5a8de249e7c53ff5c704b6abaead9f1204a3f3c350fd3bdbdaf9858f23deb0",
+      "size": 1326,
+      "modified": 1783758513244.8845
+    },
+    {
+      "path": "frontend\\src\\store\\auth.js",
+      "hash": "608530a12927f444e7790169eef1e643ca69414c7738322fa60042a0ac65b088",
+      "size": 936,
+      "modified": 1783758513244.8845
+    },
+    {
+      "path": "frontend\\src\\store\\camera.js",
+      "hash": "87cfb8464fe597747cfd1f8bbb0b53561b86c3e5883f5a3246690d9e1d1adee0",
+      "size": 663,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\store\\index.js",
+      "hash": "c793bfa1cfb36b7bbfe954c3153fa78e3cb17a4277fd95c5281717093fdbd8e2",
+      "size": 122,
+      "modified": 1783758513260.5603
+    },
+    {
+      "path": "frontend\\src\\services\\websocket.js",
+      "hash": "8facd43a3cbfe0f95b66c36cc58b0c5863569d4a4af785cdcf9e1f7e0d650c8f",
+      "size": 624,
+      "modified": 1783758513244.8845
+    },
+    {
+      "path": "frontend\\src\\router\\index.js",
+      "hash": "de934cd658eebf662bb940e9f017dfac8d0d1f8a3c03286b6dca1e913f760d29",
+      "size": 1354,
+      "modified": 1783758513244.8845
+    },
+    {
+      "path": "frontend\\src\\components\\AlarmPopup.vue",
+      "hash": "154162c9dc3ac4e8fed3f2206259d067b4d819fd32403ddef924165f558c8ade",
+      "size": 799,
+      "modified": 1783758513229.0872
+    },
+    {
+      "path": "frontend\\src\\components\\CanvasDraw.vue",
+      "hash": "ca6c9a5fc00a683d8dd1667e1ba80d6148c9c4a5649ef05c79f60ebd66099ede",
+      "size": 2581,
+      "modified": 1783758513229.0872
+    },
+    {
+      "path": "frontend\\src\\components\\VideoPlayer.vue",
+      "hash": "f3331aa5296721f44aa74325ec1f6d1fc1db02bfb3b85c65417ee56ca884948f",
+      "size": 1246,
+      "modified": 1783758513229.0872
+    },
+    {
+      "path": "frontend\\src\\api\\alarm.js",
+      "hash": "3a7b2149694f9d4d445bb192561a93cd964ed38596ee6a930fccc49840386904",
+      "size": 458,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\auth.js",
+      "hash": "ba8e5cb862ff23131ec6c8ff48d6373ed3bce4ff89eb7b14d6ac32e6981e444a",
+      "size": 437,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\dashboard.js",
+      "hash": "86b94bfe21903d1ac9a770c2b7db6250be9323929ec1f6d8e36630807cfcac54",
+      "size": 109,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\face.js",
+      "hash": "317a8941eeeb5a3c300a15f7eb2fe72e693258b8d7d718972d69114aee2274f3",
+      "size": 264,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\request.js",
+      "hash": "2677dd820e74b2b06c5c13204a7bfb0445c3c075027fe5639426b4e9dbbd883d",
+      "size": 711,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\user.js",
+      "hash": "e82a3d8d49bc86c327415b0d180153cab10d9e7029bccf0c2f6f97487603d1e6",
+      "size": 550,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "frontend\\src\\api\\zone.js",
+      "hash": "fbf9c9bce1acefa185e77b3b8d849896aac0bbeb6d02c34838e1df94edaddc1d",
+      "size": 362,
+      "modified": 1783758513213.4353
+    },
+    {
+      "path": "backend\\app.py",
+      "hash": "fcdef534d58d33292907dbe617fe8fb628d9f97091661d7f119bc8d45b03a5eb",
+      "size": 4568,
+      "modified": 1783758513054.8342
+    },
+    {
+      "path": "backend\\config.py",
+      "hash": "b15ef8df565017f012a69308226ddd7401813d240212776cf9d6a34d3ba7ae88",
+      "size": 1129,
+      "modified": 1783758513054.8342
+    },
+    {
+      "path": "backend\\manage.py",
+      "hash": "3736337be96f82366109f7b1363993341d4936f29ef7545eb17dc0dd72f074d1",
+      "size": 302,
+      "modified": 1783758513054.8342
+    },
+    {
+      "path": "backend\\run.py",
+      "hash": "1353c828a046669b12d5d429d7343713f6df49bc1463e07287808b3df767095d",
+      "size": 382,
+      "modified": 1783758513054.8342
+    },
+    {
+      "path": "backend\\test_alert_config.py",
+      "hash": "c3f51c87a3268fcf8b5dee2a06b2a1171d6dc5dcdfac1d081afb642ca3338411",
+      "size": 2261,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\test_alert_simple.py",
+      "hash": "388f9dd33688f4f8afab14fef1ebf4a2f31d0a98659ece512b4f07c55f6bf1ff",
+      "size": 3927,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\test_camera.py",
+      "hash": "e16d8012edf731e93b049e211ed68d73b18cf89d9dc289dde82644884d51fdd8",
+      "size": 3931,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\test_dingtalk.py",
+      "hash": "6e2178da0556464c44f574b6aff24de2369f96dc32479623a79865217f255643",
+      "size": 4669,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\tests\\conftest.py",
+      "hash": "d1d570186ba590a6990a48719c27cab4f14c9e5b83e0e5e92552f187cf4f1f68",
+      "size": 169,
+      "modified": 1783758513165.48
+    },
+    {
+      "path": "backend\\tests\\test_alarm_flow.py",
+      "hash": "cca966baaf1933667d3fd505e7f1ed80f453baf11f50039d98234afaffa91994",
+      "size": 1883,
+      "modified": 1783758513165.48
+    },
+    {
+      "path": "backend\\tests\\test_auth.py",
+      "hash": "b6900c6ca1b60b49ad49e323c73ecefa512aed5f105333816c5c1486d1ebcbb7",
+      "size": 1528,
+      "modified": 1783758513165.48
+    },
+    {
+      "path": "backend\\tests\\test_cv_pipeline.py",
+      "hash": "eb4c7a64f61402b506b70396940be89d0f7bcbe42c2b43467498f7eb7d99d0d4",
+      "size": 17315,
+      "modified": 1783758513165.48
+    },
+    {
+      "path": "backend\\tests\\test_face_register.py",
+      "hash": "121ea6b201003aa8b9371a46c297e1b2275297225da2c3fe03c7f55c6e646c47",
+      "size": 5158,
+      "modified": 1783758513171.346
+    },
+    {
+      "path": "backend\\tests\\test_health.py",
+      "hash": "94c01f307e8774fe5e407abbda28ff46e88d345f9ddc51ab4188ac26d8eaca5c",
+      "size": 837,
+      "modified": 1783758513171.346
+    },
+    {
+      "path": "backend\\tests\\test_pipeline_multi_worker.py",
+      "hash": "e794e43aa2ab31d1205fe327e1b84af0bde19f278719d3ee16e4a6e3e906de88",
+      "size": 2203,
+      "modified": 1783758513171.346
+    },
+    {
+      "path": "backend\\tests\\test_rule_engine_concurrency.py",
+      "hash": "e9c27f6ec890011f107de9c99b0ca79ede205417a527e37b960e2a00b1dc2a4c",
+      "size": 2048,
+      "modified": 1783758513171.346
+    },
+    {
+      "path": "backend\\tests\\__init__.py",
+      "hash": "3b42ee5c745153f2fe8533b19c35411d8d45c70bbecf0dc3ac9e60b7eb5ea07d",
+      "size": 2,
+      "modified": 1783758513171.346
+    },
+    {
+      "path": "backend\\services\\alert_handler.py",
+      "hash": "f2acb7665f34f96f5d6612dd816012f25a9fc6c2d6cf91ae711a5270f58e4979",
+      "size": 4783,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\dingtalk_alert.py",
+      "hash": "6e64e0bb0c5a1fb6fde0f9ef62728ea7a1efadb6ca20c3630719739b72cad05d",
+      "size": 14418,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\notification_svc.py",
+      "hash": "a6b59b07cbd07e5060cab08f2cef6a36e2ecc5e8b0380abf4bde4f2bfcf7405b",
+      "size": 3852,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\report_generator.py",
+      "hash": "a3d04188c935560a5508ab9b8d5ce004ca37cf8dfcc526849590a687ffc736b5",
+      "size": 5776,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\scheduler.py",
+      "hash": "098c1faced6b1c89dcfcbc32d46aa3ce730f83b77b925559ad76390af3cd14de",
+      "size": 2435,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\ws_handler.py",
+      "hash": "f6b46f45181f32b9d515f885d05d00c37b57292eae97b7a5ff6d6a8c9fa6e56e",
+      "size": 4781,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\services\\__init__.py",
+      "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+      "size": 1,
+      "modified": 1783758513149.7202
+    },
+    {
+      "path": "backend\\models\\access_log.py",
+      "hash": "80e41e482ea9fc12a7e3de508f7abf8a3216dfa796ca45d066261951328853eb",
+      "size": 2173,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\models\\alarm.py",
+      "hash": "8777152e3cf8b6152300fb9172b6b3fafd7fe6c2da1cbd0118cac5b9388ce0ef",
+      "size": 4204,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\models\\face.py",
+      "hash": "3b1e431ca7c743b2a6dc96e3c0f4a386788f0649aed5019ff46dd834145097d8",
+      "size": 2557,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\models\\user.py",
+      "hash": "fb8cd41bfca78589ad715ace1b564c962bb90a474c4d6f86e3edb247a9e24522",
+      "size": 1511,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\models\\zone.py",
+      "hash": "e24923a5a8dbe9e32a39a4d2662151039cc362b1fae29cb452b417275ec66c24",
+      "size": 673,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\models\\__init__.py",
+      "hash": "1c63fb66e54cbee8e310179bb8319dbdaaf589f828b5df35fa48bc3719eab8e7",
+      "size": 309,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\middleware\\auth_middleware.py",
+      "hash": "3295f8bff9c87ab9e94209043abb516bb15d17ce535da811ff6f25a0e651dfd3",
+      "size": 1419,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\middleware\\__init__.py",
+      "hash": "43d34a41590b1109dbc607134111a37efd8aac40286953c151590190e00ddeb3",
+      "size": 59,
+      "modified": 1783758513133.8025
+    },
+    {
+      "path": "backend\\core_cv\\face_recognizer.py",
+      "hash": "c3022b63d643d31fbca695696b4bc88c9c98bb8d8e02b3028e19dfce0bc072f7",
+      "size": 13889,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\liveness_detector.py",
+      "hash": "9af0fdf407cc85e5cf06e6d025b660ed057dc0c2cc3ca87c0f1ef08e1c9199fc",
+      "size": 2321,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\model_loader.py",
+      "hash": "94367bd20dda44b7b8304aea619ad09d61580be6ffdf4777785930a15dc7cd17",
+      "size": 5487,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\pipeline.py",
+      "hash": "0ae5375c67fc07dcf84f0e3717429ba5fb14212ab1eb4d1d0137792a0ee9e1d7",
+      "size": 31121,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\rule_engine.py",
+      "hash": "64ef9a6bea5213b1ef0b5d10ec71706f6cb50653deeffd4be999abe99cd27e5c",
+      "size": 5352,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\stream_manager.py",
+      "hash": "b023efbdc103bc0426b673679753629a944941a5296c4a9b5a5a1ae83a386231",
+      "size": 11857,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\yolo_detector.py",
+      "hash": "6a2dc44421b810529b8d29f290a825b85dc1e189c540012066b3e86baf9e25a3",
+      "size": 2039,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\core_cv\\__init__.py",
+      "hash": "f02a8f2c9726ad57e9c2ec978cf5db6699bb1f882501e540a9b4c59c50f1bb17",
+      "size": 323,
+      "modified": 1783758513102.1133
+    },
+    {
+      "path": "backend\\core_cv\\scripts\\download_models.py",
+      "hash": "72bd4dd4478bcb9a61258ea5be3731fa42b2a1cb249f7bd1cfd7014f101e306d",
+      "size": 3074,
+      "modified": 1783758513102.1133
+    },
+    {
+      "path": "backend\\api\\alert_api.py",
+      "hash": "519d71f59f2f41b8196b421a3f3cd63009320f4bbc10e950ae82f28acfc1206f",
+      "size": 5960,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\dashboard_api.py",
+      "hash": "15c4619375274f484d955ea28698ca837eaa89aaa226a6e4a33fd8d9a216abf6",
+      "size": 4472,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\event_api.py",
+      "hash": "b640c9be388590cd34a98b4df8ba5af3e8e1063ccd576375c025822ce2829d1a",
+      "size": 10447,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\face_api.py",
+      "hash": "7e4f15dbb5f7e75c246b96a47131fe34ad60185f0027ec0d54fa93247008e15a",
+      "size": 17987,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\log_api.py",
+      "hash": "41d12e62ee65e30e69e51ff7319531a93866f76bb3d7ec5bb794a5d253f5c415",
+      "size": 3367,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\rule_api.py",
+      "hash": "634f2e35230891a12cea9d7e12ee280449c426c94fb3ac80817b4c478260bb23",
+      "size": 5951,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\stream_api.py",
+      "hash": "555e0c526d7779d3d46b8fd172aedb982342565e55edeae02af08f63315f7dd9",
+      "size": 10127,
+      "modified": 1783758513070.575
+    },
+    {
+      "path": "backend\\api\\user_api.py",
+      "hash": "b41bb307b73a337a074e1cfcfa400e27af17611b3531e096e10c626be9c8d3fd",
+      "size": 2889,
+      "modified": 1783758513086.4724
+    },
+    {
+      "path": "backend\\api\\__init__.py",
+      "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+      "size": 1,
+      "modified": 1783758513086.4724
+    }
+  ],
+  "tree": {
+    "hash": "f633b3bb7763315195330b292dd74258bb7c34e9d3d486e4b7476325bceff751",
+    "left": {
+      "hash": "0b27349ae95ebce31b5d26cf8e3ad05c7845761ebd0b94ec59c73a978c4eded5",
+      "left": {
+        "hash": "7d2cbccd3539e7060ccfd0d62fc557b5552fa52199acd14a1235f8ef5e0c0678",
+        "left": {
+          "hash": "5e27c346c50c9351312174b2d3a095d84b2fa40ea9af44a99ef7940c933555ba",
+          "left": {
+            "hash": "cd590a616e98bf89730ec8c26b890da091b5d96c643bb16338c1ab5b36062bcd",
+            "left": {
+              "hash": "18f9c67b58794872f54765e59b999be8fe0c99b950ada8cfe10f6d5f06a52094",
+              "left": {
+                "hash": "8ebbd471b286e610cdb24067a2c641a9652280d1e617a5d94a0b56d576f7ec0c",
+                "left": {
+                  "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+                  "file": {
+                    "path": "backend\\api\\__init__.py",
+                    "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+                    "size": 1,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "519d71f59f2f41b8196b421a3f3cd63009320f4bbc10e950ae82f28acfc1206f",
+                  "file": {
+                    "path": "backend\\api\\alert_api.py",
+                    "hash": "519d71f59f2f41b8196b421a3f3cd63009320f4bbc10e950ae82f28acfc1206f",
+                    "size": 5960,
+                    "modified": 1783758513070.575
+                  }
+                }
+              },
+              "right": {
+                "hash": "6d1dfcfa190fa1be0fe46fd1300c07df803c535e73dd1ce4b9bc30d4d7f11c72",
+                "left": {
+                  "hash": "15c4619375274f484d955ea28698ca837eaa89aaa226a6e4a33fd8d9a216abf6",
+                  "file": {
+                    "path": "backend\\api\\dashboard_api.py",
+                    "hash": "15c4619375274f484d955ea28698ca837eaa89aaa226a6e4a33fd8d9a216abf6",
+                    "size": 4472,
+                    "modified": 1783758513070.575
+                  }
+                },
+                "right": {
+                  "hash": "b640c9be388590cd34a98b4df8ba5af3e8e1063ccd576375c025822ce2829d1a",
+                  "file": {
+                    "path": "backend\\api\\event_api.py",
+                    "hash": "b640c9be388590cd34a98b4df8ba5af3e8e1063ccd576375c025822ce2829d1a",
+                    "size": 10447,
+                    "modified": 1783758513070.575
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "ff096f5635bcb8de541a12cac8a63d83639e1ea70b1e0b0b090a4cb00bb6932c",
+              "left": {
+                "hash": "75c98e7ba20cb10e624d444467d991b61daad17703a1892d9ec27d63556d23b9",
+                "left": {
+                  "hash": "7e4f15dbb5f7e75c246b96a47131fe34ad60185f0027ec0d54fa93247008e15a",
+                  "file": {
+                    "path": "backend\\api\\face_api.py",
+                    "hash": "7e4f15dbb5f7e75c246b96a47131fe34ad60185f0027ec0d54fa93247008e15a",
+                    "size": 17987,
+                    "modified": 1783758513070.575
+                  }
+                },
+                "right": {
+                  "hash": "41d12e62ee65e30e69e51ff7319531a93866f76bb3d7ec5bb794a5d253f5c415",
+                  "file": {
+                    "path": "backend\\api\\log_api.py",
+                    "hash": "41d12e62ee65e30e69e51ff7319531a93866f76bb3d7ec5bb794a5d253f5c415",
+                    "size": 3367,
+                    "modified": 1783758513070.575
+                  }
+                }
+              },
+              "right": {
+                "hash": "a00d7f89d84327c7afc12ad43101b1e6fab3c7ba0cfb1f86259fd2c3aacb910e",
+                "left": {
+                  "hash": "634f2e35230891a12cea9d7e12ee280449c426c94fb3ac80817b4c478260bb23",
+                  "file": {
+                    "path": "backend\\api\\rule_api.py",
+                    "hash": "634f2e35230891a12cea9d7e12ee280449c426c94fb3ac80817b4c478260bb23",
+                    "size": 5951,
+                    "modified": 1783758513070.575
+                  }
+                },
+                "right": {
+                  "hash": "555e0c526d7779d3d46b8fd172aedb982342565e55edeae02af08f63315f7dd9",
+                  "file": {
+                    "path": "backend\\api\\stream_api.py",
+                    "hash": "555e0c526d7779d3d46b8fd172aedb982342565e55edeae02af08f63315f7dd9",
+                    "size": 10127,
+                    "modified": 1783758513070.575
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "hash": "b235dafda44d9e986ab87bae544dd21f75112d3f139f6ab9597399afbf4b0cd3",
+            "left": {
+              "hash": "02e4e3ba1ae3b3157a3916722fd8c217763395b2c90a9d145988ce51a92ea7bc",
+              "left": {
+                "hash": "58396720bbefac5b26fd3fda6dd99b75e855fb35f5d7568d2120c9d0e1f91ce8",
+                "left": {
+                  "hash": "b41bb307b73a337a074e1cfcfa400e27af17611b3531e096e10c626be9c8d3fd",
+                  "file": {
+                    "path": "backend\\api\\user_api.py",
+                    "hash": "b41bb307b73a337a074e1cfcfa400e27af17611b3531e096e10c626be9c8d3fd",
+                    "size": 2889,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "fcdef534d58d33292907dbe617fe8fb628d9f97091661d7f119bc8d45b03a5eb",
+                  "file": {
+                    "path": "backend\\app.py",
+                    "hash": "fcdef534d58d33292907dbe617fe8fb628d9f97091661d7f119bc8d45b03a5eb",
+                    "size": 4568,
+                    "modified": 1783758513054.8342
+                  }
+                }
+              },
+              "right": {
+                "hash": "3184c60537d7b6b8242655a8c1439502df423663f3b760c8cf49fe3cbe744d24",
+                "left": {
+                  "hash": "b15ef8df565017f012a69308226ddd7401813d240212776cf9d6a34d3ba7ae88",
+                  "file": {
+                    "path": "backend\\config.py",
+                    "hash": "b15ef8df565017f012a69308226ddd7401813d240212776cf9d6a34d3ba7ae88",
+                    "size": 1129,
+                    "modified": 1783758513054.8342
+                  }
+                },
+                "right": {
+                  "hash": "f02a8f2c9726ad57e9c2ec978cf5db6699bb1f882501e540a9b4c59c50f1bb17",
+                  "file": {
+                    "path": "backend\\core_cv\\__init__.py",
+                    "hash": "f02a8f2c9726ad57e9c2ec978cf5db6699bb1f882501e540a9b4c59c50f1bb17",
+                    "size": 323,
+                    "modified": 1783758513102.1133
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "3f6f86e676a7b818a50cee6e009bd71d0a919edf3c627f7af5e441e45ef55944",
+              "left": {
+                "hash": "aa56894e3ae65957b996a54aaa0c5f086774fb1665ab3d93355560c539a22e24",
+                "left": {
+                  "hash": "c3022b63d643d31fbca695696b4bc88c9c98bb8d8e02b3028e19dfce0bc072f7",
+                  "file": {
+                    "path": "backend\\core_cv\\face_recognizer.py",
+                    "hash": "c3022b63d643d31fbca695696b4bc88c9c98bb8d8e02b3028e19dfce0bc072f7",
+                    "size": 13889,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "9af0fdf407cc85e5cf06e6d025b660ed057dc0c2cc3ca87c0f1ef08e1c9199fc",
+                  "file": {
+                    "path": "backend\\core_cv\\liveness_detector.py",
+                    "hash": "9af0fdf407cc85e5cf06e6d025b660ed057dc0c2cc3ca87c0f1ef08e1c9199fc",
+                    "size": 2321,
+                    "modified": 1783758513086.4724
+                  }
+                }
+              },
+              "right": {
+                "hash": "3578765b5e37282f3eba568dbdc935321d7cceba036a5b3da3fc4fc7802199ca",
+                "left": {
+                  "hash": "94367bd20dda44b7b8304aea619ad09d61580be6ffdf4777785930a15dc7cd17",
+                  "file": {
+                    "path": "backend\\core_cv\\model_loader.py",
+                    "hash": "94367bd20dda44b7b8304aea619ad09d61580be6ffdf4777785930a15dc7cd17",
+                    "size": 5487,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "0ae5375c67fc07dcf84f0e3717429ba5fb14212ab1eb4d1d0137792a0ee9e1d7",
+                  "file": {
+                    "path": "backend\\core_cv\\pipeline.py",
+                    "hash": "0ae5375c67fc07dcf84f0e3717429ba5fb14212ab1eb4d1d0137792a0ee9e1d7",
+                    "size": 31121,
+                    "modified": 1783758513086.4724
+                  }
+                }
+              }
+            }
+          }
+        },
+        "right": {
+          "hash": "57b43816cff9f786ee8c922fea4160ff5e1fad1b29ae2031309595ea6d9a4672",
+          "left": {
+            "hash": "a999be21af43feabb55375b98fde50a527e53c1c608f5985d5d9b57f5cac056f",
+            "left": {
+              "hash": "a9b7094a45fefda3a17b6699e3a36ade9d193458aa6a1aa103f9cb06b545ec1d",
+              "left": {
+                "hash": "bc63cc0e8fe7f94e80af760a5860f024c986b544c61a20d631d71b1a24193e04",
+                "left": {
+                  "hash": "64ef9a6bea5213b1ef0b5d10ec71706f6cb50653deeffd4be999abe99cd27e5c",
+                  "file": {
+                    "path": "backend\\core_cv\\rule_engine.py",
+                    "hash": "64ef9a6bea5213b1ef0b5d10ec71706f6cb50653deeffd4be999abe99cd27e5c",
+                    "size": 5352,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "72bd4dd4478bcb9a61258ea5be3731fa42b2a1cb249f7bd1cfd7014f101e306d",
+                  "file": {
+                    "path": "backend\\core_cv\\scripts\\download_models.py",
+                    "hash": "72bd4dd4478bcb9a61258ea5be3731fa42b2a1cb249f7bd1cfd7014f101e306d",
+                    "size": 3074,
+                    "modified": 1783758513102.1133
+                  }
+                }
+              },
+              "right": {
+                "hash": "0dda1cf18695e40d53a7d3198d90b945cbe324e7f1f124ba1ca50f5daed7f8d8",
+                "left": {
+                  "hash": "b023efbdc103bc0426b673679753629a944941a5296c4a9b5a5a1ae83a386231",
+                  "file": {
+                    "path": "backend\\core_cv\\stream_manager.py",
+                    "hash": "b023efbdc103bc0426b673679753629a944941a5296c4a9b5a5a1ae83a386231",
+                    "size": 11857,
+                    "modified": 1783758513086.4724
+                  }
+                },
+                "right": {
+                  "hash": "6a2dc44421b810529b8d29f290a825b85dc1e189c540012066b3e86baf9e25a3",
+                  "file": {
+                    "path": "backend\\core_cv\\yolo_detector.py",
+                    "hash": "6a2dc44421b810529b8d29f290a825b85dc1e189c540012066b3e86baf9e25a3",
+                    "size": 2039,
+                    "modified": 1783758513086.4724
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "f13ec8174a5fe125764949ab07dc6c9708e9d4be9ca3ded52e3bef60f76313d3",
+              "left": {
+                "hash": "ba09db8ab862b6e33c578c89a8ffc58fa6d3b8530c8592c78eecd145f9f0ba3f",
+                "left": {
+                  "hash": "3736337be96f82366109f7b1363993341d4936f29ef7545eb17dc0dd72f074d1",
+                  "file": {
+                    "path": "backend\\manage.py",
+                    "hash": "3736337be96f82366109f7b1363993341d4936f29ef7545eb17dc0dd72f074d1",
+                    "size": 302,
+                    "modified": 1783758513054.8342
+                  }
+                },
+                "right": {
+                  "hash": "43d34a41590b1109dbc607134111a37efd8aac40286953c151590190e00ddeb3",
+                  "file": {
+                    "path": "backend\\middleware\\__init__.py",
+                    "hash": "43d34a41590b1109dbc607134111a37efd8aac40286953c151590190e00ddeb3",
+                    "size": 59,
+                    "modified": 1783758513133.8025
+                  }
+                }
+              },
+              "right": {
+                "hash": "52b50f9a78b24950c5ba7941840008ceafff7c5913638b57e5b4546947099b35",
+                "left": {
+                  "hash": "3295f8bff9c87ab9e94209043abb516bb15d17ce535da811ff6f25a0e651dfd3",
+                  "file": {
+                    "path": "backend\\middleware\\auth_middleware.py",
+                    "hash": "3295f8bff9c87ab9e94209043abb516bb15d17ce535da811ff6f25a0e651dfd3",
+                    "size": 1419,
+                    "modified": 1783758513133.8025
+                  }
+                },
+                "right": {
+                  "hash": "1c63fb66e54cbee8e310179bb8319dbdaaf589f828b5df35fa48bc3719eab8e7",
+                  "file": {
+                    "path": "backend\\models\\__init__.py",
+                    "hash": "1c63fb66e54cbee8e310179bb8319dbdaaf589f828b5df35fa48bc3719eab8e7",
+                    "size": 309,
+                    "modified": 1783758513133.8025
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "hash": "96f00b5ebb9a6bcdd998535820a5d881429b630eca8ae460bddedcee74db9622",
+            "left": {
+              "hash": "9bb38a14f68cdca76a7837489d474c6e6b2ba897659ffc490ade6c372539d5b7",
+              "left": {
+                "hash": "13856290af595e1f325caea1bca50533e92da313b689a5aec049a8e50cf31042",
+                "left": {
+                  "hash": "80e41e482ea9fc12a7e3de508f7abf8a3216dfa796ca45d066261951328853eb",
+                  "file": {
+                    "path": "backend\\models\\access_log.py",
+                    "hash": "80e41e482ea9fc12a7e3de508f7abf8a3216dfa796ca45d066261951328853eb",
+                    "size": 2173,
+                    "modified": 1783758513133.8025
+                  }
+                },
+                "right": {
+                  "hash": "8777152e3cf8b6152300fb9172b6b3fafd7fe6c2da1cbd0118cac5b9388ce0ef",
+                  "file": {
+                    "path": "backend\\models\\alarm.py",
+                    "hash": "8777152e3cf8b6152300fb9172b6b3fafd7fe6c2da1cbd0118cac5b9388ce0ef",
+                    "size": 4204,
+                    "modified": 1783758513133.8025
+                  }
+                }
+              },
+              "right": {
+                "hash": "f90e4dab6cc0f84a8509426dfaab158f3f84765c36b79465bfe9c7dddaacd8a0",
+                "left": {
+                  "hash": "3b1e431ca7c743b2a6dc96e3c0f4a386788f0649aed5019ff46dd834145097d8",
+                  "file": {
+                    "path": "backend\\models\\face.py",
+                    "hash": "3b1e431ca7c743b2a6dc96e3c0f4a386788f0649aed5019ff46dd834145097d8",
+                    "size": 2557,
+                    "modified": 1783758513133.8025
+                  }
+                },
+                "right": {
+                  "hash": "fb8cd41bfca78589ad715ace1b564c962bb90a474c4d6f86e3edb247a9e24522",
+                  "file": {
+                    "path": "backend\\models\\user.py",
+                    "hash": "fb8cd41bfca78589ad715ace1b564c962bb90a474c4d6f86e3edb247a9e24522",
+                    "size": 1511,
+                    "modified": 1783758513133.8025
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "09d199b37a7439e55b97d58dbb164b666a4ad25abc19c3d2b5f15a3ba54022f9",
+              "left": {
+                "hash": "614a413a2055436a3face0674193f13a6583c352dcbfed08fc29293c7d3a9a39",
+                "left": {
+                  "hash": "e24923a5a8dbe9e32a39a4d2662151039cc362b1fae29cb452b417275ec66c24",
+                  "file": {
+                    "path": "backend\\models\\zone.py",
+                    "hash": "e24923a5a8dbe9e32a39a4d2662151039cc362b1fae29cb452b417275ec66c24",
+                    "size": 673,
+                    "modified": 1783758513133.8025
+                  }
+                },
+                "right": {
+                  "hash": "1353c828a046669b12d5d429d7343713f6df49bc1463e07287808b3df767095d",
+                  "file": {
+                    "path": "backend\\run.py",
+                    "hash": "1353c828a046669b12d5d429d7343713f6df49bc1463e07287808b3df767095d",
+                    "size": 382,
+                    "modified": 1783758513054.8342
+                  }
+                }
+              },
+              "right": {
+                "hash": "bfa15d3d6a35e3b8e0ec57291f9277fc7e08650c7473864d58e30f5f1e510ccd",
+                "left": {
+                  "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+                  "file": {
+                    "path": "backend\\services\\__init__.py",
+                    "hash": "5b4b01a4a3892ea3751793da57f072ae08eec694ddcda872239fc8239e4bcd1b",
+                    "size": 1,
+                    "modified": 1783758513149.7202
+                  }
+                },
+                "right": {
+                  "hash": "f2acb7665f34f96f5d6612dd816012f25a9fc6c2d6cf91ae711a5270f58e4979",
+                  "file": {
+                    "path": "backend\\services\\alert_handler.py",
+                    "hash": "f2acb7665f34f96f5d6612dd816012f25a9fc6c2d6cf91ae711a5270f58e4979",
+                    "size": 4783,
+                    "modified": 1783758513149.7202
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "right": {
+        "hash": "ee3c06234cfc907118e66e3d2b0563e8b814b31a0048f9530ffc914ef20702f2",
+        "left": {
+          "hash": "57674b467bb8d39086d8c3e60fbdeb236c7dd174ac46c38a24f04dc4bf80cefe",
+          "left": {
+            "hash": "b280f209ade28b3543b3c4926899cef951c5b61531f6e352ee30420b50c9b689",
+            "left": {
+              "hash": "8cdc998065c614dff6679accf38882e7fec809519eb98e30189d9c53c8a1bd58",
+              "left": {
+                "hash": "1b5cf39d28a79b892138e4813aa36513c51fc5f9f80793aec389ca5fd2a014b1",
+                "left": {
+                  "hash": "6e64e0bb0c5a1fb6fde0f9ef62728ea7a1efadb6ca20c3630719739b72cad05d",
+                  "file": {
+                    "path": "backend\\services\\dingtalk_alert.py",
+                    "hash": "6e64e0bb0c5a1fb6fde0f9ef62728ea7a1efadb6ca20c3630719739b72cad05d",
+                    "size": 14418,
+                    "modified": 1783758513149.7202
+                  }
+                },
+                "right": {
+                  "hash": "a6b59b07cbd07e5060cab08f2cef6a36e2ecc5e8b0380abf4bde4f2bfcf7405b",
+                  "file": {
+                    "path": "backend\\services\\notification_svc.py",
+                    "hash": "a6b59b07cbd07e5060cab08f2cef6a36e2ecc5e8b0380abf4bde4f2bfcf7405b",
+                    "size": 3852,
+                    "modified": 1783758513149.7202
+                  }
+                }
+              },
+              "right": {
+                "hash": "40a7784734727b254c92e1489e0c401f882c63ad88069de6dc4b3609a1d979b4",
+                "left": {
+                  "hash": "a3d04188c935560a5508ab9b8d5ce004ca37cf8dfcc526849590a687ffc736b5",
+                  "file": {
+                    "path": "backend\\services\\report_generator.py",
+                    "hash": "a3d04188c935560a5508ab9b8d5ce004ca37cf8dfcc526849590a687ffc736b5",
+                    "size": 5776,
+                    "modified": 1783758513149.7202
+                  }
+                },
+                "right": {
+                  "hash": "098c1faced6b1c89dcfcbc32d46aa3ce730f83b77b925559ad76390af3cd14de",
+                  "file": {
+                    "path": "backend\\services\\scheduler.py",
+                    "hash": "098c1faced6b1c89dcfcbc32d46aa3ce730f83b77b925559ad76390af3cd14de",
+                    "size": 2435,
+                    "modified": 1783758513149.7202
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "f536f21797b150e74fc17f6a6120e2803cbcde2aba79eb4944840b74b2e84cf2",
+              "left": {
+                "hash": "cd62bfe20d55b0faa49b7ba0f9d76355eeef30cfa69572a647e250fe24b6c91d",
+                "left": {
+                  "hash": "f6b46f45181f32b9d515f885d05d00c37b57292eae97b7a5ff6d6a8c9fa6e56e",
+                  "file": {
+                    "path": "backend\\services\\ws_handler.py",
+                    "hash": "f6b46f45181f32b9d515f885d05d00c37b57292eae97b7a5ff6d6a8c9fa6e56e",
+                    "size": 4781,
+                    "modified": 1783758513149.7202
+                  }
+                },
+                "right": {
+                  "hash": "c3f51c87a3268fcf8b5dee2a06b2a1171d6dc5dcdfac1d081afb642ca3338411",
+                  "file": {
+                    "path": "backend\\test_alert_config.py",
+                    "hash": "c3f51c87a3268fcf8b5dee2a06b2a1171d6dc5dcdfac1d081afb642ca3338411",
+                    "size": 2261,
+                    "modified": 1783758513070.575
+                  }
+                }
+              },
+              "right": {
+                "hash": "5d4a62f9a14a05f1f36a2d422f56c224bb2772a0fd95577c148964e48866c71e",
+                "left": {
+                  "hash": "388f9dd33688f4f8afab14fef1ebf4a2f31d0a98659ece512b4f07c55f6bf1ff",
+                  "file": {
+                    "path": "backend\\test_alert_simple.py",
+                    "hash": "388f9dd33688f4f8afab14fef1ebf4a2f31d0a98659ece512b4f07c55f6bf1ff",
+                    "size": 3927,
+                    "modified": 1783758513070.575
+                  }
+                },
+                "right": {
+                  "hash": "e16d8012edf731e93b049e211ed68d73b18cf89d9dc289dde82644884d51fdd8",
+                  "file": {
+                    "path": "backend\\test_camera.py",
+                    "hash": "e16d8012edf731e93b049e211ed68d73b18cf89d9dc289dde82644884d51fdd8",
+                    "size": 3931,
+                    "modified": 1783758513070.575
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "hash": "678da306cda7577156f660a64d4351dc3e443f20884af6beea0e65b3eeb2226e",
+            "left": {
+              "hash": "2735e5cac2db71bdba9e1bf2db6af130e1b620d021c30ae83b2d498e80bfbaf3",
+              "left": {
+                "hash": "0470cabb3cbf68a664808f2cd6ef4dd5b630de2e546b8a0e0b8687456dd14e6c",
+                "left": {
+                  "hash": "6e2178da0556464c44f574b6aff24de2369f96dc32479623a79865217f255643",
+                  "file": {
+                    "path": "backend\\test_dingtalk.py",
+                    "hash": "6e2178da0556464c44f574b6aff24de2369f96dc32479623a79865217f255643",
+                    "size": 4669,
+                    "modified": 1783758513070.575
+                  }
+                },
+                "right": {
+                  "hash": "3b42ee5c745153f2fe8533b19c35411d8d45c70bbecf0dc3ac9e60b7eb5ea07d",
+                  "file": {
+                    "path": "backend\\tests\\__init__.py",
+                    "hash": "3b42ee5c745153f2fe8533b19c35411d8d45c70bbecf0dc3ac9e60b7eb5ea07d",
+                    "size": 2,
+                    "modified": 1783758513171.346
+                  }
+                }
+              },
+              "right": {
+                "hash": "37ca1000387478d9d3351f3bf6b20af9a41d48cabb6fb7bfc83cec11b687ddc1",
+                "left": {
+                  "hash": "d1d570186ba590a6990a48719c27cab4f14c9e5b83e0e5e92552f187cf4f1f68",
+                  "file": {
+                    "path": "backend\\tests\\conftest.py",
+                    "hash": "d1d570186ba590a6990a48719c27cab4f14c9e5b83e0e5e92552f187cf4f1f68",
+                    "size": 169,
+                    "modified": 1783758513165.48
+                  }
+                },
+                "right": {
+                  "hash": "cca966baaf1933667d3fd505e7f1ed80f453baf11f50039d98234afaffa91994",
+                  "file": {
+                    "path": "backend\\tests\\test_alarm_flow.py",
+                    "hash": "cca966baaf1933667d3fd505e7f1ed80f453baf11f50039d98234afaffa91994",
+                    "size": 1883,
+                    "modified": 1783758513165.48
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "71bc63d79c3f299254eff10e13f7b101fa0f37b7952b833209c98c833f195d78",
+              "left": {
+                "hash": "e2f089d83f9d2ea2563622dc399483963d9dc8bd1be6c7e8637b2270dd2b2c20",
+                "left": {
+                  "hash": "b6900c6ca1b60b49ad49e323c73ecefa512aed5f105333816c5c1486d1ebcbb7",
+                  "file": {
+                    "path": "backend\\tests\\test_auth.py",
+                    "hash": "b6900c6ca1b60b49ad49e323c73ecefa512aed5f105333816c5c1486d1ebcbb7",
+                    "size": 1528,
+                    "modified": 1783758513165.48
+                  }
+                },
+                "right": {
+                  "hash": "eb4c7a64f61402b506b70396940be89d0f7bcbe42c2b43467498f7eb7d99d0d4",
+                  "file": {
+                    "path": "backend\\tests\\test_cv_pipeline.py",
+                    "hash": "eb4c7a64f61402b506b70396940be89d0f7bcbe42c2b43467498f7eb7d99d0d4",
+                    "size": 17315,
+                    "modified": 1783758513165.48
+                  }
+                }
+              },
+              "right": {
+                "hash": "23657843ed01f0f247350e73f913adc47972a5248bcf5b3a169765d4cf8e7e8e",
+                "left": {
+                  "hash": "121ea6b201003aa8b9371a46c297e1b2275297225da2c3fe03c7f55c6e646c47",
+                  "file": {
+                    "path": "backend\\tests\\test_face_register.py",
+                    "hash": "121ea6b201003aa8b9371a46c297e1b2275297225da2c3fe03c7f55c6e646c47",
+                    "size": 5158,
+                    "modified": 1783758513171.346
+                  }
+                },
+                "right": {
+                  "hash": "94c01f307e8774fe5e407abbda28ff46e88d345f9ddc51ab4188ac26d8eaca5c",
+                  "file": {
+                    "path": "backend\\tests\\test_health.py",
+                    "hash": "94c01f307e8774fe5e407abbda28ff46e88d345f9ddc51ab4188ac26d8eaca5c",
+                    "size": 837,
+                    "modified": 1783758513171.346
+                  }
+                }
+              }
+            }
+          }
+        },
+        "right": {
+          "hash": "946679daf38ac52c7bd9981cbdf0ddaa5f9fcbb865caecdd7c2d38d5f83f9fe4",
+          "left": {
+            "hash": "92018c46368ee7cd5a0fb73c3f2a9b53a829a6e133b35974a3bee2e9cd2ebd19",
+            "left": {
+              "hash": "01c3cf8ed970810c89b9442b1f1625629d1055fa40668809ad5a403c5cff680f",
+              "left": {
+                "hash": "53c5916a638c78dedab746fbb045e7d8c1ec0eddb400b1fcd6891e7ac4d79dcd",
+                "left": {
+                  "hash": "e794e43aa2ab31d1205fe327e1b84af0bde19f278719d3ee16e4a6e3e906de88",
+                  "file": {
+                    "path": "backend\\tests\\test_pipeline_multi_worker.py",
+                    "hash": "e794e43aa2ab31d1205fe327e1b84af0bde19f278719d3ee16e4a6e3e906de88",
+                    "size": 2203,
+                    "modified": 1783758513171.346
+                  }
+                },
+                "right": {
+                  "hash": "e9c27f6ec890011f107de9c99b0ca79ede205417a527e37b960e2a00b1dc2a4c",
+                  "file": {
+                    "path": "backend\\tests\\test_rule_engine_concurrency.py",
+                    "hash": "e9c27f6ec890011f107de9c99b0ca79ede205417a527e37b960e2a00b1dc2a4c",
+                    "size": 2048,
+                    "modified": 1783758513171.346
+                  }
+                }
+              },
+              "right": {
+                "hash": "97e817c784e7ebb718aa99d3ba6f52ea16dacedb0e31f5b4246fb10c5dfebd52",
+                "left": {
+                  "hash": "f2ec94fea701df11a7f8f52e2d98534e83123615258f13358d1275d81506019e",
+                  "file": {
+                    "path": "frontend\\.eslintrc.js",
+                    "hash": "f2ec94fea701df11a7f8f52e2d98534e83123615258f13358d1275d81506019e",
+                    "size": 176,
+                    "modified": 1783758513197.3584
+                  }
+                },
+                "right": {
+                  "hash": "3a7b2149694f9d4d445bb192561a93cd964ed38596ee6a930fccc49840386904",
+                  "file": {
+                    "path": "frontend\\src\\api\\alarm.js",
+                    "hash": "3a7b2149694f9d4d445bb192561a93cd964ed38596ee6a930fccc49840386904",
+                    "size": 458,
+                    "modified": 1783758513213.4353
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "ded3b56988ad5e160c9923d397ad9edb9a8791bb9b20bca99fe83adefd8ce26a",
+              "left": {
+                "hash": "62d33e2096cd10567e8cd6bcb419e7fa70986f68204f64dde08aa2e821958bff",
+                "left": {
+                  "hash": "ba8e5cb862ff23131ec6c8ff48d6373ed3bce4ff89eb7b14d6ac32e6981e444a",
+                  "file": {
+                    "path": "frontend\\src\\api\\auth.js",
+                    "hash": "ba8e5cb862ff23131ec6c8ff48d6373ed3bce4ff89eb7b14d6ac32e6981e444a",
+                    "size": 437,
+                    "modified": 1783758513213.4353
+                  }
+                },
+                "right": {
+                  "hash": "86b94bfe21903d1ac9a770c2b7db6250be9323929ec1f6d8e36630807cfcac54",
+                  "file": {
+                    "path": "frontend\\src\\api\\dashboard.js",
+                    "hash": "86b94bfe21903d1ac9a770c2b7db6250be9323929ec1f6d8e36630807cfcac54",
+                    "size": 109,
+                    "modified": 1783758513213.4353
+                  }
+                }
+              },
+              "right": {
+                "hash": "2f5872397a637208c5fe45f4102cf5737b03f0dcfd342bdfb920df05bc9a1f40",
+                "left": {
+                  "hash": "317a8941eeeb5a3c300a15f7eb2fe72e693258b8d7d718972d69114aee2274f3",
+                  "file": {
+                    "path": "frontend\\src\\api\\face.js",
+                    "hash": "317a8941eeeb5a3c300a15f7eb2fe72e693258b8d7d718972d69114aee2274f3",
+                    "size": 264,
+                    "modified": 1783758513213.4353
+                  }
+                },
+                "right": {
+                  "hash": "2677dd820e74b2b06c5c13204a7bfb0445c3c075027fe5639426b4e9dbbd883d",
+                  "file": {
+                    "path": "frontend\\src\\api\\request.js",
+                    "hash": "2677dd820e74b2b06c5c13204a7bfb0445c3c075027fe5639426b4e9dbbd883d",
+                    "size": 711,
+                    "modified": 1783758513213.4353
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "hash": "154e0785b1eecbcbb68998740f993af2cdd9db0284c294de0f8c942434f388a2",
+            "left": {
+              "hash": "d71d156bc2db0a2709999a017a15a11d4f4d8273275165e5890fbe2c13d53ee2",
+              "left": {
+                "hash": "379ade78760e7bb6ae7afdbb9cc1e3bf7a34ffc214ae001e86cde2f816216662",
+                "left": {
+                  "hash": "e82a3d8d49bc86c327415b0d180153cab10d9e7029bccf0c2f6f97487603d1e6",
+                  "file": {
+                    "path": "frontend\\src\\api\\user.js",
+                    "hash": "e82a3d8d49bc86c327415b0d180153cab10d9e7029bccf0c2f6f97487603d1e6",
+                    "size": 550,
+                    "modified": 1783758513213.4353
+                  }
+                },
+                "right": {
+                  "hash": "fbf9c9bce1acefa185e77b3b8d849896aac0bbeb6d02c34838e1df94edaddc1d",
+                  "file": {
+                    "path": "frontend\\src\\api\\zone.js",
+                    "hash": "fbf9c9bce1acefa185e77b3b8d849896aac0bbeb6d02c34838e1df94edaddc1d",
+                    "size": 362,
+                    "modified": 1783758513213.4353
+                  }
+                }
+              },
+              "right": {
+                "hash": "286d08f6400805ce8340996107ec16bc37a5df2b66ed701a34a5e7c6b7f8874b",
+                "left": {
+                  "hash": "cdb32ce7e9629300828ec3623f9fd5ba2e5a7fa1f8a28c80384a60674478906f",
+                  "file": {
+                    "path": "frontend\\src\\App.vue",
+                    "hash": "cdb32ce7e9629300828ec3623f9fd5ba2e5a7fa1f8a28c80384a60674478906f",
+                    "size": 2049,
+                    "modified": 1783758513213.4353
+                  }
+                },
+                "right": {
+                  "hash": "154162c9dc3ac4e8fed3f2206259d067b4d819fd32403ddef924165f558c8ade",
+                  "file": {
+                    "path": "frontend\\src\\components\\AlarmPopup.vue",
+                    "hash": "154162c9dc3ac4e8fed3f2206259d067b4d819fd32403ddef924165f558c8ade",
+                    "size": 799,
+                    "modified": 1783758513229.0872
+                  }
+                }
+              }
+            },
+            "right": {
+              "hash": "d80f23fefc681eb3c16b28fcd0d815867e55620239e551d2caf119c63bb52cd8",
+              "left": {
+                "hash": "ba70421f4e3578c6c2271d71986eda5cfc6e5b69823fd83a1bcfe7fc16f948b8",
+                "left": {
+                  "hash": "ca6c9a5fc00a683d8dd1667e1ba80d6148c9c4a5649ef05c79f60ebd66099ede",
+                  "file": {
+                    "path": "frontend\\src\\components\\CanvasDraw.vue",
+                    "hash": "ca6c9a5fc00a683d8dd1667e1ba80d6148c9c4a5649ef05c79f60ebd66099ede",
+                    "size": 2581,
+                    "modified": 1783758513229.0872
+                  }
+                },
+                "right": {
+                  "hash": "f3331aa5296721f44aa74325ec1f6d1fc1db02bfb3b85c65417ee56ca884948f",
+                  "file": {
+                    "path": "frontend\\src\\components\\VideoPlayer.vue",
+                    "hash": "f3331aa5296721f44aa74325ec1f6d1fc1db02bfb3b85c65417ee56ca884948f",
+                    "size": 1246,
+                    "modified": 1783758513229.0872
+                  }
+                }
+              },
+              "right": {
+                "hash": "eae277623f402238029eab4e807a86e67d56854527a0a6c32b6ae81ce46f6a47",
+                "left": {
+                  "hash": "6b84c065a4f3e6a39c71c3cd57329b1ede4244b1a76ae8b439581c16c7009104",
+                  "file": {
+                    "path": "frontend\\src\\main.js",
+                    "hash": "6b84c065a4f3e6a39c71c3cd57329b1ede4244b1a76ae8b439581c16c7009104",
+                    "size": 302,
+                    "modified": 1783758513213.4353
+                  }
+                },
+                "right": {
+                  "hash": "de934cd658eebf662bb940e9f017dfac8d0d1f8a3c03286b6dca1e913f760d29",
+                  "file": {
+                    "path": "frontend\\src\\router\\index.js",
+                    "hash": "de934cd658eebf662bb940e9f017dfac8d0d1f8a3c03286b6dca1e913f760d29",
+                    "size": 1354,
+                    "modified": 1783758513244.8845
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "right": {
+      "hash": "88546cf9a72e8648af51470c2f3d18f2bc032a9a2a9b8269982ca2b54c761531",
+      "left": {
+        "hash": "34dd606a337d9ce7e3b10d358cd2d86121e23ddf9b03d85970691e3ebe260a14",
+        "left": {
+          "hash": "4db496a03e92343bfbf16982060800d266ffc8b22d1f4262ffe638171bfcf4aa",
+          "left": {
+            "hash": "0d5ab0a3c698ce256405bc51e10d89287f3721a6c769ae67a50968ba06f02e45",
+            "left": {
+              "hash": "8facd43a3cbfe0f95b66c36cc58b0c5863569d4a4af785cdcf9e1f7e0d650c8f",
+              "file": {
+                "path": "frontend\\src\\services\\websocket.js",
+                "hash": "8facd43a3cbfe0f95b66c36cc58b0c5863569d4a4af785cdcf9e1f7e0d650c8f",
+                "size": 624,
+                "modified": 1783758513244.8845
+              }
+            },
+            "right": {
+              "hash": "cc5a8de249e7c53ff5c704b6abaead9f1204a3f3c350fd3bdbdaf9858f23deb0",
+              "file": {
+                "path": "frontend\\src\\store\\alarms.js",
+                "hash": "cc5a8de249e7c53ff5c704b6abaead9f1204a3f3c350fd3bdbdaf9858f23deb0",
+                "size": 1326,
+                "modified": 1783758513244.8845
+              }
+            }
+          },
+          "right": {
+            "hash": "b0d6c0fefa12d2d1615f1511af5117e08ab0ec0b28da6f991278e58ae4f54005",
+            "left": {
+              "hash": "608530a12927f444e7790169eef1e643ca69414c7738322fa60042a0ac65b088",
+              "file": {
+                "path": "frontend\\src\\store\\auth.js",
+                "hash": "608530a12927f444e7790169eef1e643ca69414c7738322fa60042a0ac65b088",
+                "size": 936,
+                "modified": 1783758513244.8845
+              }
+            },
+            "right": {
+              "hash": "87cfb8464fe597747cfd1f8bbb0b53561b86c3e5883f5a3246690d9e1d1adee0",
+              "file": {
+                "path": "frontend\\src\\store\\camera.js",
+                "hash": "87cfb8464fe597747cfd1f8bbb0b53561b86c3e5883f5a3246690d9e1d1adee0",
+                "size": 663,
+                "modified": 1783758513260.5603
+              }
+            }
+          }
+        },
+        "right": {
+          "hash": "e75ddcf702e82c150ce7d5305e9ea30b89bf4f462a0faa03fa6211a15bda00e4",
+          "left": {
+            "hash": "4085b77e1d0746038c8526c03701e0ca9446a84b20a610dd0602a38e78dca68f",
+            "left": {
+              "hash": "c793bfa1cfb36b7bbfe954c3153fa78e3cb17a4277fd95c5281717093fdbd8e2",
+              "file": {
+                "path": "frontend\\src\\store\\index.js",
+                "hash": "c793bfa1cfb36b7bbfe954c3153fa78e3cb17a4277fd95c5281717093fdbd8e2",
+                "size": 122,
+                "modified": 1783758513260.5603
+              }
+            },
+            "right": {
+              "hash": "e1b11aff27a7a9084e77b480fcdfaeb5b0ee91b16ae2d7fe9c974931e2d3d21f",
+              "file": {
+                "path": "frontend\\src\\views\\AlarmHistory.vue",
+                "hash": "e1b11aff27a7a9084e77b480fcdfaeb5b0ee91b16ae2d7fe9c974931e2d3d21f",
+                "size": 2722,
+                "modified": 1783758513260.5603
+              }
+            }
+          },
+          "right": {
+            "hash": "e8833332e56ce6be3a06ef542d2d74e9b4da2d6d0f497fc54a79ed7c622ec2da",
+            "left": {
+              "hash": "8c2c3d01ad960ed9f6ab6b18242520acfece256172832d65b975f119e0928b34",
+              "file": {
+                "path": "frontend\\src\\views\\Dashboard.vue",
+                "hash": "8c2c3d01ad960ed9f6ab6b18242520acfece256172832d65b975f119e0928b34",
+                "size": 3165,
+                "modified": 1783758513260.5603
+              }
+            },
+            "right": {
+              "hash": "c0e08d269916bb9e40f30b371974160c38dae399b40a5e396ce70c5df9c98e72",
+              "file": {
+                "path": "frontend\\src\\views\\FaceAccess.vue",
+                "hash": "c0e08d269916bb9e40f30b371974160c38dae399b40a5e396ce70c5df9c98e72",
+                "size": 7574,
+                "modified": 1783758513260.5603
+              }
+            }
+          }
+        }
+      },
+      "right": {
+        "hash": "5e98aef77c7ac53af82db76f2fd5abb045949137c4ca6f4de4b8109b1c0cd755",
+        "left": {
+          "hash": "3cb493fce6107caa18dd9070c881b837b045c7e96df27e69086d812032fcb016",
+          "left": {
+            "hash": "f8762d6d6780a6b4dedcb1c693457bffad12d2413b7f13163a8ed0c1a6cb4e22",
+            "file": {
+              "path": "frontend\\src\\views\\Login.vue",
+              "hash": "f8762d6d6780a6b4dedcb1c693457bffad12d2413b7f13163a8ed0c1a6cb4e22",
+              "size": 1501,
+              "modified": 1783758513260.5603
+            }
+          },
+          "right": {
+            "hash": "14d5a4fa237c734cdd3a21b42e8e97b82e1492dea7ddbfcac3bc5a4a5988491c",
+            "file": {
+              "path": "frontend\\src\\views\\PerimeterConfig.vue",
+              "hash": "14d5a4fa237c734cdd3a21b42e8e97b82e1492dea7ddbfcac3bc5a4a5988491c",
+              "size": 2125,
+              "modified": 1783758513260.5603
+            }
+          }
+        },
+        "right": {
+          "hash": "cd06aa6dc1e9ea4133e94261e6057044b7afbb4e059d3b780b94fec7e6528145",
+          "left": {
+            "hash": "a3c96248e89304ca96df309822dbea0a936b1a48ebdaa9bb08c1b9ef7fda2abc",
+            "file": {
+              "path": "frontend\\vite.config.js",
+              "hash": "a3c96248e89304ca96df309822dbea0a936b1a48ebdaa9bb08c1b9ef7fda2abc",
+              "size": 719,
+              "modified": 1783758513203.526
+            }
+          },
+          "right": {
+            "hash": "fe140ba72da048f9e61dc80b83f6b516db22d334b42f4fb0d1561cc350efa21e",
+            "file": {
+              "path": "frontend\\vitest.config.js",
+              "hash": "fe140ba72da048f9e61dc80b83f6b516db22d334b42f4fb0d1561cc350efa21e",
+              "size": 196,
+              "modified": 1783758513203.526
+            }
+          }
+        }
+      }
+    }
+  }
+}

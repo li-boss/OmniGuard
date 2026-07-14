@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+env/
+
+# Database
+*.sqlite
+*.db
+instance/
+
+# Environment
+.env
+
+# Node.js
+node_modules/
+.npm
+dist/
+.vite/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+.arts/
+*.swp
+*.swo
+
+# Models and Weights
+*.onnx
+*.pt
+*.pth
+*.h5
+*.pb
+backend/core_cv/weights/
+
+# Registered face data
+backend/data/faces/
+
+# Generated files
+backend/static/snapshots/
+backend/static/reports/
+backend/static/videos/
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# CodeArts
+.codeartsdoer/

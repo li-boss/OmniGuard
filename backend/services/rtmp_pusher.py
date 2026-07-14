@@ -31,6 +31,7 @@ class RtmpPusher:
             self.rtmp_url = "rtmp://39.97.236.134:9090/live/cam01"
             self.camera_index = 0
             self.latest_frame = None
+            self.frame_id = 0
             self.frame_lock = threading.Lock()
             self._initialized = True
 
@@ -117,6 +118,7 @@ class RtmpPusher:
 
                 with self.frame_lock:
                     self.latest_frame = frame.copy()
+                    self.frame_id += 1
 
                 time.sleep(0.001)
 

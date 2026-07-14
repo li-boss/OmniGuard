@@ -422,6 +422,7 @@ class CameraPipeline:
         self.tracker = SimpleTracker()
         self.zones = []
         self.temporal_filter = {} # Map object_id -> list of names for temporal filtering
+        self.track_face_cache = {} # Map object_id -> relative face box cache for interpolation
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
         self.triggered_falls = set()  # Track already triggered fall alarms
         self.triggered_fires = set()  # Track already triggered fire alarms
@@ -531,6 +532,7 @@ class CameraPipeline:
             for active_id in list(self.temporal_filter.keys()):
                 if active_id not in tracks:
                     self.temporal_filter.pop(active_id, None)
+                    self.track_face_cache.pop(active_id, None)
                     self.triggered_spoofs.discard(active_id)
                     self.triggered_falls.discard(active_id)
                     self.triggered_fires.discard(active_id)
@@ -558,6 +560,55 @@ class CameraPipeline:
                 face_found, face_box_norm, name, user_id, dist = self.face_recognizer.detect_and_recognize_in_person(
                     frame, det["box"], track_id=obj_id
                 )
+
+                # Relative face box cache and interpolation to prevent flickering during head movements
+                h, w = frame.shape[:2]
+                if face_found and face_box_norm and h > 0 and w > 0:
+                    px1, py1, px2, py2 = det["box"]
+                    pw = max(1, px2 - px1)
+                    ph = max(1, py2 - py1)
+                    
+                    fx1 = face_box_norm[0] * w
+                    fy1 = face_box_norm[1] * h
+                    fx2 = face_box_norm[2] * w
+                    fy2 = face_box_norm[3] * h
+                    
+                    rx1 = (fx1 - px1) / pw
+                    ry1 = (fy1 - py1) / ph
+                    rx2 = (fx2 - px1) / pw
+                    ry2 = (fy2 - py1) / ph
+                    
+                    self.track_face_cache[obj_id] = {
+                        "rel_box": [rx1, ry1, rx2, ry2],
+                        "name": name,
+                        "user_id": user_id,
+                        "dist": dist,
+                        "last_seen": time.time()
+                    }
+                else:
+                    cached = self.track_face_cache.get(obj_id)
+                    if cached and time.time() - cached["last_seen"] < 1.0:
+                        px1, py1, px2, py2 = det["box"]
+                        pw = px2 - px1
+                        ph = py2 - py1
+                        rx1, ry1, rx2, ry2 = cached["rel_box"]
+                        
+                        if w > 0 and h > 0:
+                            nfx1 = px1 + rx1 * pw
+                            nfy1 = py1 + ry1 * ph
+                            nfx2 = px1 + rx2 * pw
+                            nfy2 = py1 + ry2 * ph
+                            
+                            face_box_norm = [
+                                max(0.0, min(1.0, nfx1 / w)),
+                                max(0.0, min(1.0, nfy1 / h)),
+                                max(0.0, min(1.0, nfx2 / w)),
+                                max(0.0, min(1.0, nfy2 / h))
+                            ]
+                            face_found = True
+                            name = cached["name"]
+                            user_id = cached["user_id"]
+                            dist = cached["dist"]
 
                 if user_id is not None:
                     zone_id = None

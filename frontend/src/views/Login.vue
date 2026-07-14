@@ -19,8 +19,14 @@ async function submit() {
   try {
     await auth.login(form)
     router.push('/dashboard')
-  } catch {
-    ElMessage.error('登录失败')
+  } catch (error) {
+    if (!error.response) {
+      ElMessage.error('无法连接到后端服务，请等待系统模型加载完成（约10-15秒）')
+    } else if (error.response.status === 401) {
+      ElMessage.error('用户名或密码错误')
+    } else {
+      ElMessage.error(error.response.data?.message || '登录失败')
+    }
   } finally {
     loading.value = false
   }

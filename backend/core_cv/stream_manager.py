@@ -22,6 +22,7 @@ class StreamManager:
         self.connected = False
         self._lock = threading.RLock()
         self._local_backend_index = 0
+        self.last_local_frame_id = -1
         
         # Async reader thread state
         self.latest_frame = None
@@ -221,7 +222,12 @@ class StreamManager:
     def get_latest_frame(self, base_timeout_ms=1000):
         if self._is_local_camera():
             from services.rtmp_pusher import rtmp_pusher_svc
-            return rtmp_pusher_svc.get_latest_frame()
+            with rtmp_pusher_svc.frame_lock:
+                current_id = getattr(rtmp_pusher_svc, "frame_id", 0)
+                if current_id == self.last_local_frame_id:
+                    return None
+                self.last_local_frame_id = current_id
+                return rtmp_pusher_svc.latest_frame.copy() if rtmp_pusher_svc.latest_frame is not None else None
 
         # Automatically start the background thread if it is not running
         if not self.running:

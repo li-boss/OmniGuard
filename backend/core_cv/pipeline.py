@@ -18,6 +18,12 @@ from .face_recognizer import FaceRecognizer
 from .rule_engine import RuleEngine
 
 try:
+    from .hand_raise_detector import HandRaiseDetector
+    HAND_RAISE_DETECTOR_AVAILABLE = True
+except ImportError:
+    HAND_RAISE_DETECTOR_AVAILABLE = False
+
+try:
     from .fall_detector import FallDetector
     FALL_DETECTOR_AVAILABLE = True
 except ImportError:
@@ -437,6 +443,10 @@ class CameraPipeline:
         self.spoof_temporal_filter = {} # Map object_id -> list of spoof states for temporal consensus
         self.track_face_cache = {} # Map object_id -> relative face box cache for interpolation
         self.triggered_spoofs = set() # Track already triggered spoofing alarms to avoid spamming
+        self.triggered_hand_raises = set()  # Track already triggered hand raise alarms
+        self.hand_raise_confirmation_history = {}  # Recent hand raise decisions per tracked person
+        self.hand_raise_confirmation_window = 3
+        self.hand_raise_confirmation_required = 2
         self.triggered_falls = set()  # Track already triggered fall alarms
         self.fall_confirmation_history = {}  # Recent fall decisions per tracked person
         self.fall_confirmation_window = 5
@@ -446,9 +456,17 @@ class CameraPipeline:
         self._last_access_log_at = {}
         self._access_log_cooldown_seconds = 18000.0
         
-        # Initialize fall and fire detectors if available
+        # Initialize hand raise, fall and fire detectors if available
+        self.hand_raise_detector = None
         self.fall_detector = None
         self.fire_detector = None
+        if HAND_RAISE_DETECTOR_AVAILABLE:
+            try:
+                self.hand_raise_detector = HandRaiseDetector()
+                logger.info(f"HandRaiseDetector initialized for camera {camera_id}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize HandRaiseDetector for camera {camera_id}: {e}")
+        
         if FALL_DETECTOR_AVAILABLE:
             try:
                 self.fall_detector = FallDetector()
@@ -530,6 +548,25 @@ class CameraPipeline:
         self.zones = zones
         logger.info(f"Updated {len(zones)} zones for camera {self.camera_id}")
 
+    def _confirm_hand_raise(self, object_id, hand_raise_result):
+        is_hand_raised = bool(
+            hand_raise_result
+            and hand_raise_result.get("hand_raised", False)
+        )
+        history = self.hand_raise_confirmation_history.setdefault(object_id, [])
+        history.append(is_hand_raised)
+        if len(history) > self.hand_raise_confirmation_window:
+            del history[:-self.hand_raise_confirmation_window]
+
+        if (
+            len(history) < self.hand_raise_confirmation_required
+            or sum(history) < self.hand_raise_confirmation_required
+        ):
+            return False
+
+        self.hand_raise_confirmation_history.pop(object_id, None)
+        return True
+
     def _confirm_fall(self, object_id, fall_result):
         is_fall = bool(
             fall_result
@@ -563,6 +600,10 @@ class CameraPipeline:
             person_boxes = [det["box"] for det in detections]
             tracks = self.tracker.update(person_boxes)
 
+            for active_id in list(self.hand_raise_confirmation_history):
+                if active_id not in tracks:
+                    self.hand_raise_confirmation_history.pop(active_id, None)
+
             for active_id in list(self.fall_confirmation_history):
                 if active_id not in tracks:
                     self.fall_confirmation_history.pop(active_id, None)
@@ -574,6 +615,8 @@ class CameraPipeline:
                     self.spoof_temporal_filter.pop(active_id, None)
                     self.track_face_cache.pop(active_id, None)
                     self.triggered_spoofs.discard(active_id)
+                    self.triggered_hand_raises.discard(active_id)
+                    self.hand_raise_confirmation_history.pop(active_id, None)
                     self.triggered_falls.discard(active_id)
                     self.fall_confirmation_history.pop(active_id, None)
                     self.triggered_strangers.discard(active_id)
@@ -665,7 +708,44 @@ class CameraPipeline:
                     confidence = 1.0 - min(dist, 1.0)
                     self._record_recognized_access(user_id, zone_id=zone_id, confidence=confidence)
 
-                # ========== 异常检测（跌倒和火情）==========
+                # ========== 异常检测（举手、跌倒和火情）==========
+                # 举手检测
+                if self.hand_raise_detector and obj_id not in self.triggered_hand_raises:
+                    try:
+                        hand_raise_result = self.hand_raise_detector.detect(frame, det["box"])
+                        if self._confirm_hand_raise(obj_id, hand_raise_result):
+                            self.triggered_hand_raises.add(obj_id)
+                            logger.warning(f"Hand raise detected for Object {obj_id} on camera {self.camera_id}")
+                            
+                            coordinate_info = {
+                                "person_box": det["box_norm"],
+                                "face_box": face_box_norm if face_found else None
+                            }
+                            alarm_data = {
+                                "alarm_type": "异常活动告警",
+                                "level": "medium",
+                                "camera_id": self.camera_id,
+                                "coordinate": coordinate_info,
+                                "snapshot_frame": frame.copy(),
+                                "name": name if name != "Stranger" else "陌生人",
+                                "object_id": obj_id,
+                                "description": "检测到举手",
+                                "triggered_at": datetime.utcnow(),
+                                "triggered_monotonic": time.monotonic(),
+                                "detection_data": {
+                                    "type": "hand_raise",
+                                    "confidence": hand_raise_result.get("confidence", 0.0),
+                                    "details": hand_raise_result.get("details", {})
+                                }
+                            }
+                            try:
+                                alarm_queue.put_nowait(alarm_data)
+                                logger.info(f"Hand raise alarm pushed to queue for Object {obj_id}")
+                            except queue.Full:
+                                pass
+                    except Exception as e:
+                        logger.error(f"Hand raise detection error for Object {obj_id}: {e}")
+
                 # 跌倒检测
                 if self.fall_detector and obj_id not in self.triggered_falls:
                     try:

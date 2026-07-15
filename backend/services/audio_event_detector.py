@@ -25,6 +25,14 @@ DISPLAY_NAMES = {
 
 CATEGORY_KEYWORDS = {
     "explosion": (
+        "glass",
+        "shatter",
+        "breaking",
+        "smash, crash",
+        "crack",
+        "chink, clink",
+    ),
+    "glass_break": (
         "explosion",
         "boom",
         "fireworks",
@@ -36,14 +44,6 @@ CATEGORY_KEYWORDS = {
         "fusillade",
         "artillery fire",
         "cap gun",
-    ),
-    "glass_break": (
-        "glass",
-        "shatter",
-        "breaking",
-        "smash, crash",
-        "crack",
-        "chink, clink",
     ),
 }
 

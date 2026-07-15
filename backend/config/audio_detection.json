@@ -8,8 +8,8 @@
   "input_device": null,
   "camera_id": "cam-1",
   "thresholds": {
-    "explosion": 0.01,
-    "glass_break": 0.01
+    "explosion": 0.005,
+    "glass_break": 0.005
   },
   "confirmation_count": 2,
   "cooldown_seconds": 3.0,

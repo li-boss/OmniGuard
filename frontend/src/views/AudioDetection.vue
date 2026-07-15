@@ -149,8 +149,7 @@ onBeforeUnmount(() => {
     <el-descriptions :column="2" border>
       <el-descriptions-item label="YAMNet 原始类别">{{ result?.matched_raw_class || result?.raw_class || '-' }}</el-descriptions-item>
       <el-descriptions-item label="检测时间">{{ result?.detected_at || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="爆炸声阈值">{{ status.thresholds?.explosion ?? '-' }}</el-descriptions-item>
-      <el-descriptions-item label="玻璃破碎阈值">{{ status.thresholds?.glass_break ?? '-' }}</el-descriptions-item>
+
     </el-descriptions>
 
     <el-alert v-if="status.last_error" type="error" :title="status.last_error" show-icon :closable="false" />

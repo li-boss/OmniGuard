@@ -10,11 +10,6 @@ logging.basicConfig(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-
-# Load environment variables from .env file
-from dotenv import load_dotenv
-load_dotenv(BASE_DIR / '.env')
-
 from flask_jwt_extended import JWTManager
 from services.ws_handler import socketio
 jwt = JWTManager()
@@ -85,13 +80,13 @@ def create_app(config_class=Config):
     from api.alert_api import alert_bp
     from api.report_api import report_bp
     from api.access_log_api import access_log_bp
-    from api.multimodal_api import multimodal_bp
+    from api.audio_api import audio_bp
     app.register_blueprint(face_bp)
     app.register_blueprint(stream_bp, url_prefix="/api/streams")
     app.register_blueprint(alert_bp)
     app.register_blueprint(report_bp, url_prefix="/api/reports")
     app.register_blueprint(access_log_bp)
-    app.register_blueprint(multimodal_bp, url_prefix="/api/multimodal")
+    app.register_blueprint(audio_bp, url_prefix="/api/audio-detection")
 
     (BASE_DIR / 'data' / 'faces').mkdir(parents=True, exist_ok=True)
 
@@ -159,23 +154,10 @@ def create_app(config_class=Config):
             alert_handler = get_alert_handler()
             alert_handler.start()
             atexit.register(alert_handler.stop)
-            
-            from services.camera_audio_monitor import CameraAudioMonitor
-            camera_audio_monitor = CameraAudioMonitor(app)
-            camera_audio_monitor.start()
-            atexit.register(camera_audio_monitor.stop)
-            
-            # Preload YAMNet model if audio semantic detection is enabled
-            try:
-                from services.multimodal_fusion import semantic_detector
-                if semantic_detector.enabled:
-                    logging.info("Preloading YAMNet model...")
-                    # Trigger lazy loading with a dummy audio sample
-                    import numpy as np
-                    semantic_detector.analyze(np.zeros(16000, dtype=np.float32), 16000)
-                    logging.info("YAMNet model preloaded successfully")
-            except Exception as e:
-                logging.warning(f"Failed to preload YAMNet model: {e}")
+
+            from services.audio_event_detector import get_audio_event_detector
+            audio_event_detector = get_audio_event_detector(app)
+            atexit.register(audio_event_detector.stop)
 
     return app
 

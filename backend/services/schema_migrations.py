@@ -18,3 +18,11 @@ def ensure_alarm_video_path_column():
     if "snapshot_path" not in columns:
         db.session.execute(text("ALTER TABLE alarm_events ADD COLUMN snapshot_path VARCHAR(500)"))
         db.session.commit()
+    if "occurred_at" not in columns:
+        db.session.execute(text("ALTER TABLE alarm_events ADD COLUMN occurred_at DATETIME"))
+        db.session.execute(text(
+            "UPDATE alarm_events "
+            "SET occurred_at = COALESCE(triggered_at, created_at) "
+            "WHERE occurred_at IS NULL"
+        ))
+        db.session.commit()

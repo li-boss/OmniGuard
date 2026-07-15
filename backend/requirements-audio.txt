@@ -1,6 +1,8 @@
-# Full runtime requirements, including semantic YAMNet audio classification.
-# setup.ps1 installs this file by default for a clone-and-run experience.
--r requirements.txt
+# Optional dependencies for YAMNet microphone and WAV detection.
+# Use a TensorFlow build compatible with the selected Python version.
+numpy>=1.26,<2
+tensorflow>=2.15
+tensorflow-hub>=0.16.1
+sounddevice>=0.4.6
+scipy>=1.14.1
 setuptools<81
-tensorflow-cpu>=2.16,<2.22
-tensorflow-hub>=0.16,<0.17

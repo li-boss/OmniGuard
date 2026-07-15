@@ -10,6 +10,7 @@ import {
   Users,
   FileText,
   DoorOpen,
+  Volume2,
 } from '@lucide/vue'
 
 import AlarmPopup from './components/AlarmPopup.vue'
@@ -25,6 +26,7 @@ const alarms = useAlarmsStore()
 const isLogin = computed(() => route.name === 'login')
 
 const navItems = [
+  { path: '/audio-detection', label: '声音', icon: Volume2 },
   { path: '/dashboard', label: '大盘', icon: ChartNoAxesCombined },
   { path: '/alarms', label: '告警', icon: Bell },
   { path: '/reports', label: '日报', icon: FileText },

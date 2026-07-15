@@ -113,7 +113,9 @@ def push_alarm(alarm_dict):
 
     # 按订阅推送
     has_subscribers = False
-    for sid, cameras in _subscribed_cameras.items():
+    # Snapshot subscriptions to avoid "dictionary changed size during iteration"
+    subscribed = dict(_subscribed_cameras)
+    for sid, cameras in subscribed.items():
         if not cameras or camera_id in cameras:
             has_subscribers = True
             socketio.emit('alarm', full_dict, room=sid)

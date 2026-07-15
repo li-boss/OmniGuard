@@ -83,6 +83,7 @@ IMMEDIATE_AUDIO_ALARM_THRESHOLDS = {
     "shout": 0.55,
     "yell": 0.55,
     "argument": 0.55,
+    "impact_candidate": 0.7,
 }
 
 

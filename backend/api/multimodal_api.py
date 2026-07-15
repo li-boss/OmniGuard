@@ -44,13 +44,26 @@ def _evaluate(payload):
             else:
                 _last_alarm_at[camera_id] = now
         if not alarm_suppressed:
+            # Determine alarm type and description based on audio label
+            alarm_type = "multimodal_anomaly"
+            description = "检测到异常声音或多模态联动风险"
+            
+            # Check if impact_candidate triggered the alarm
+            detection_data = decision.to_dict()
+            reasons = detection_data.get("reasons", [])
+            for reason in reasons:
+                if reason.startswith("audio:impact_candidate"):
+                    alarm_type = "异常活动告警"
+                    description = "检测到争吵或冲突声音"
+                    break
+            
             event = AlarmEvent(
-                alarm_type="multimodal_anomaly",
+                alarm_type=alarm_type,
                 level=decision.severity,
                 camera_id=camera_id,
                 zone_id=zone_id,
-                description="检测到异常声音或多模态联动风险",
-                detection_data=decision.to_dict(),
+                description=description,
+                detection_data=detection_data,
                 status="pending",
             )
             db.session.add(event)

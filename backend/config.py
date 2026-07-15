@@ -28,11 +28,3 @@ class Config:
     FACE_MATCH_THRESHOLD = float(os.getenv("FACE_MATCH_THRESHOLD", "0.32"))
     DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "admin")
     DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
-    
-    # Audio detection configuration
-    AUDIO_SEMANTIC_ENABLED = os.getenv("AUDIO_SEMANTIC_ENABLED", "true").lower() == "true"
-    YAMNET_MODEL_URL = os.getenv("YAMNET_MODEL_URL", "https://tfhub.dev/google/yamnet/1")
-    AUDIO_CHUNK_SECONDS = float(os.getenv("AUDIO_CHUNK_SECONDS", "0.5"))
-    AUDIO_ALARM_COOLDOWN_SECONDS = float(os.getenv("AUDIO_ALARM_COOLDOWN_SECONDS", "30"))
-    CAMERA_AUDIO_MONITOR_ENABLED = os.getenv("CAMERA_AUDIO_MONITOR_ENABLED", "false").lower() == "true"
-    FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")

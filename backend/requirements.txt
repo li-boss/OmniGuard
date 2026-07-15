@@ -24,3 +24,6 @@ waitress==3.0.2
 
 pytest==8.4.2
 retinaface-py==0.0.2
+
+# Real-time environmental sound detection (YAMNet + local microphone)
+-r requirements-audio.txt

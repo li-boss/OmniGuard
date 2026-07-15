@@ -12,6 +12,10 @@ class FireDetector:
         self.model = None
         self.class_names = ['fire', 'smoke']
         
+        # Temporal consensus for color-based detection: require N consecutive fire-positive frames
+        self._consecutive_fire_count = 0
+        self._min_consecutive_frames = 3
+        
         if model_path is None:
             model_path = Path(__file__).parent / 'weights' / 'fire_yolov8n.pt'
         
@@ -114,12 +118,16 @@ class FireDetector:
         try:
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             
-            lower_fire1 = np.array([0, 50, 150])
+            # Moderate HSV ranges — balanced between catching real fire and filtering warm objects:
+            # - S_min=60 (above typical skin/wood saturation of 30-50, below flame's ~100+)
+            # - V_min=180 (above room lighting, below bright flame center)
+            # - H range for orange: 15-40 (excludes deep brown at 40-50)
+            lower_fire1 = np.array([0, 60, 180])
             upper_fire1 = np.array([15, 255, 255])
-            lower_fire2 = np.array([165, 50, 150])
+            lower_fire2 = np.array([165, 60, 180])
             upper_fire2 = np.array([180, 255, 255])
-            lower_fire3 = np.array([15, 50, 200])
-            upper_fire3 = np.array([50, 255, 255])
+            lower_fire3 = np.array([15, 60, 200])
+            upper_fire3 = np.array([40, 255, 255])
             
             mask1 = cv2.inRange(hsv, lower_fire1, upper_fire1)
             mask2 = cv2.inRange(hsv, lower_fire2, upper_fire2)
@@ -130,19 +138,30 @@ class FireDetector:
             total_pixels = frame.shape[0] * frame.shape[1]
             fire_ratio = fire_pixels / total_pixels
             
-            fire_detected = fire_ratio > 0.05
+            # Moderate threshold — 7% filters scattered warm pixels (FP at 6.3%) but catches real fire
+            fire_detected = fire_ratio > 0.07
             
             smoke_detected = False
             smoke_ratio = 0.0
             
-            if fire_ratio > 0.0001:
-                logger.info(f"Fire detection: ratio={fire_ratio:.6f}, threshold=0.05, detected={fire_detected}")
+            if fire_ratio > 0.001:
+                logger.info(f"Fire detection: ratio={fire_ratio:.6f}, threshold=0.07, fire_pixels={fire_pixels}, detected={fire_detected}")
+            
+            # Temporal consensus: require N consecutive fire-positive frames
+            if fire_detected:
+                self._consecutive_fire_count += 1
+                if self._consecutive_fire_count < self._min_consecutive_frames:
+                    fire_detected = False  # Suppress until consensus is reached
+                    logger.debug(f"Fire color match but waiting for consensus: {self._consecutive_fire_count}/{self._min_consecutive_frames}")
+            else:
+                self._consecutive_fire_count = 0  # Reset counter on negative frame
             
             detections = []
             if fire_detected:
                 contours, _ = cv2.findContours(fire_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 for contour in contours:
-                    if cv2.contourArea(contour) > 100:
+                    # Increase min contour area from 100→500 to filter scattered noise pixels
+                    if cv2.contourArea(contour) > 500:
                         x, y, w, h = cv2.boundingRect(contour)
                         detections.append({
                             'bbox': [x, y, w, h],

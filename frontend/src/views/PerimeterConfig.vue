@@ -14,6 +14,7 @@ const form = reactive({
   name: '主入口电子围栏',
   ruleType: 'intrusion',
   points: [],
+  staySeconds: 5,
 })
 
 function getCameraName(cameraId) {
@@ -39,6 +40,7 @@ async function save() {
   await zoneApi.createZone({ ...form })
   ElMessage.success('围栏已保存')
   form.points = []
+  form.staySeconds = 5
   await load()
 }
 
@@ -72,6 +74,9 @@ onMounted(load)
         <el-form-item label="名称">
           <el-input v-model="form.name" />
         </el-form-item>
+        <el-form-item label="触发告警停留时间 (秒)">
+          <el-input-number v-model="form.staySeconds" :min="1" :max="60" style="width: 100%" />
+        </el-form-item>
       </el-form>
       <CanvasDraw v-model="form.points" />
     </section>
@@ -84,7 +89,7 @@ onMounted(load)
         <article v-for="zone in zones" :key="zone.id" class="list-row">
           <div>
             <strong>{{ zone.name }}</strong>
-            <span>{{ getCameraName(zone.cameraId) }} / {{ zone.points.length }} 点</span>
+            <span>{{ getCameraName(zone.cameraId) }} / {{ zone.points.length }} 点 / 停留 {{ zone.staySeconds || zone.stay_seconds || 5 }} 秒</span>
           </div>
           <el-button size="small" @click="remove(zone)">删除</el-button>
         </article>

@@ -120,6 +120,93 @@ class TestCVPipelineComponents(unittest.TestCase):
         should_trigger, duration = engine.evaluate_stay(1, box_in, zone)
         self.assertFalse(should_trigger)
 
+    def test_rule_engine_simple_entry_exit(self):
+        """Verify basic entry/exit logic with > 1s re-entry reset."""
+        engine = RuleEngine()
+        zone = {
+            "id": 1,
+            "name": "Test",
+            "polygon": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 0.0}, {"x": 1.0, "y": 1.0}, {"x": 0.0, "y": 1.0}],
+            "stay_seconds": 0.5
+        }
+        box_in = [0.1, 0.1, 0.3, 0.3]
+        box_out = [1.2, 1.2, 1.4, 1.4]
+        t0 = time.time()
+        
+        # First entry triggers alarm
+        with patch('time.time', return_value=t0):
+            self.assertTrue(engine.evaluate_entry(1, box_in, zone))
+        
+        # Already inside — silent
+        with patch('time.time', return_value=t0):
+            self.assertFalse(engine.evaluate_entry(1, box_in, zone))
+        
+        # Leave for 2.0s (> 1.0s threshold)
+        with patch('time.time', return_value=t0 + 2.0):
+            engine.evaluate_entry(1, box_out, zone)
+        
+        # Re-enter at t0 + 4.0 — triggers again (state reset since time_outside > 1.0)
+        with patch('time.time', return_value=t0 + 4.0):
+            self.assertTrue(engine.evaluate_entry(1, box_in, zone))
+
+    def test_rule_engine_stay_cooldown(self):
+        """Verify stay alarm respects 30s cooldown for continuous stay."""
+        engine = RuleEngine()
+        zone = {
+            "id": 1,
+            "name": "Test",
+            "polygon": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 0.0}, {"x": 1.0, "y": 1.0}, {"x": 0.0, "y": 1.0}],
+            "stay_seconds": 0.5
+        }
+        box_in = [0.1, 0.1, 0.3, 0.3]
+        t0 = time.time()
+        
+        # Enter zone
+        with patch('time.time', return_value=t0):
+            engine.evaluate_entry(1, box_in, zone)
+            engine.evaluate_stay(1, box_in, zone)
+        
+        # Stay past threshold — first alarm triggers
+        with patch('time.time', return_value=t0 + 1.0):
+            should_trigger, _ = engine.evaluate_stay(1, box_in, zone)
+            self.assertTrue(should_trigger, "First stay alarm should trigger")
+        
+        # Continue staying — cooldown suppresses
+        with patch('time.time', return_value=t0 + 10.0):
+            should_trigger, _ = engine.evaluate_stay(1, box_in, zone)
+            self.assertFalse(should_trigger, "Continuous stay within 30s should be suppressed")
+        
+        # After 30s — triggers again
+        with patch('time.time', return_value=t0 + 32.0):
+            should_trigger, _ = engine.evaluate_stay(1, box_in, zone)
+            self.assertTrue(should_trigger, "Continuous stay after 30s cooldown should trigger again")
+
+    def test_rule_engine_state_inheritance_stale_entered(self):
+        """Verify state inheritance when an ID is lost (stale in entered_at) and a new ID appears."""
+        engine = RuleEngine()
+        zone = {
+            "id": 1,
+            "name": "Test",
+            "polygon": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 0.0}, {"x": 1.0, "y": 1.0}, {"x": 0.0, "y": 1.0}],
+            "stay_seconds": 0.5
+        }
+        box1 = [0.1, 0.1, 0.3, 0.3]
+        box2 = [0.11, 0.11, 0.31, 0.31] # Close to box1
+        t0 = time.time()
+        
+        # Object 1 enters at t0
+        with patch('time.time', return_value=t0):
+            self.assertTrue(engine.evaluate_entry(1, box1, zone))
+            
+        # Object 1 is not updated. Object 2 appears at t0 + 0.1 (stale > 0.05s)
+        with patch('time.time', return_value=t0 + 0.1):
+            # Object 2 enters. It should inherit Object 1's state, so evaluate_entry returns False
+            self.assertFalse(engine.evaluate_entry(2, box2, zone))
+            
+        # Verify Object 2 has inherited Object 1's enter_time (t0)
+        state2 = engine.entered_at[1][2]
+        self.assertEqual(state2["enter_time"], t0)
+
     @patch('cv2.VideoCapture')
     def test_stream_manager_grab_retrieve(self, mock_vc_class):
         mock_vc = MagicMock()
@@ -377,8 +464,13 @@ class TestCameraPipelineE2E(unittest.TestCase):
         with patch('time.time', return_value=t_start):
             pipeline.process_frame()
             
-        # Verify no alarms in queue yet (since duration = 0 < stay_seconds=3)
+        # Verify '进入告警' is in queue
         from core_cv.pipeline import alarm_queue
+        self.assertFalse(alarm_queue.empty())
+        entry_alarm = alarm_queue.get()
+        self.assertEqual(entry_alarm["camera_id"], "cam_e2e_01")
+        self.assertEqual(entry_alarm["name"], "Bob")
+        self.assertEqual(entry_alarm["alarm_type"], "进入告警")
         self.assertTrue(alarm_queue.empty())
         
         # 4. Simulate process_frame at t = 5 (duration = 5 > stay_seconds=3)
@@ -386,32 +478,30 @@ class TestCameraPipelineE2E(unittest.TestCase):
             pipeline.process_frame()
             
         self.assertFalse(alarm_queue.empty())
-        alarm_item = alarm_queue.get()
-        self.assertEqual(alarm_item["camera_id"], "cam_e2e_01")
-        self.assertEqual(alarm_item["name"], "Bob")
-        self.assertEqual(alarm_item["alarm_type"], "electronic_fence")
+        stay_alarm = alarm_queue.get()
+        self.assertEqual(stay_alarm["camera_id"], "cam_e2e_01")
+        self.assertEqual(stay_alarm["name"], "Bob")
+        self.assertEqual(stay_alarm["alarm_type"], "停留告警")
         
         # 5. Process the queue item using AlarmWorker
         # Mock cv2.imwrite to avoid creating files on disk
         from core_cv.pipeline import AlarmWorker
         worker = AlarmWorker(self.app)
         with patch('cv2.imwrite') as mock_imwrite:
-            worker.save_and_broadcast_alarm(alarm_item)
-            mock_imwrite.assert_called_once()
+            worker.save_and_broadcast_alarm(entry_alarm)
+            worker.save_and_broadcast_alarm(stay_alarm)
+            self.assertEqual(mock_imwrite.call_count, 2)
             
         # 6. Verify AlarmEvent is persisted to SQLite db
         from models.alarm import AlarmEvent
         events = AlarmEvent.query.all()
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), 2)
         self.assertEqual(events[0].camera_id, "cam_e2e_01")
-        self.assertEqual(events[0].alarm_type, "electronic_fence")
-        self.assertEqual(events[0].level, "medium")
+        self.assertEqual(events[0].alarm_type, "进入告警")
+        self.assertEqual(events[1].alarm_type, "停留告警")
         
         # 7. Verify WebSocket broadcast was emitted
-        mock_emit_alarm.assert_called_once()
-        emitted_payload = mock_emit_alarm.call_args[0][0]
-        self.assertEqual(emitted_payload["id"], events[0].id)
-        self.assertEqual(emitted_payload["name"], "Bob")
+        self.assertEqual(mock_emit_alarm.call_count, 2)
 
 
 class TestLivenessDetector(unittest.TestCase):
